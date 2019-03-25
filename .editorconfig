@@ -1,0 +1,13 @@
+# Sorry if this conflicts with your preferred editorconfig, this file is only
+# really here to fix Github's insane default of 8 spaces wide tab characters
+#
+# https://github.com/isaacs/github/issues/170
+# https://github.com/isaacs/github/issues/1490
+
+[*.{c,cpp,cc,cxx,h,hpp,rc,manifest,asm,nasm,s,inc}]
+charset = utf-8
+end_of_line = crlf
+indent_style = tab
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true

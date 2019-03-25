@@ -1,0 +1,96 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{D7484EBA-6357-4D81-B355-066E28D5DF72}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(SolutionDir)\EfiGuard.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>ZYAN_UEFI;ZYAN_NO_LIBC;ZYCORE_STATIC_DEFINE;ZYDIS_STATIC_DEFINE;ZYDIS_DISABLE_AVX512;ZYDIS_DISABLE_KNC;ZYDIS_DISABLE_FORMATTER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)Include;Zydis/dependencies/zycore/include;Zydis/include;Zydis/src;Zydis/msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>MaxSpeed</Optimization>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>UefiDriverEntryPoint.lib;BaseMemoryLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>EFI Runtime</SubSystem>
+      <SectionAlignment>4096</SectionAlignment>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="EfiGuardDxe.c" />
+    <ClCompile Include="PatchBootmgr.c" />
+    <ClCompile Include="PatchNtoskrnl.c" />
+    <ClCompile Include="PatchWinload.c" />
+    <ClCompile Include="pe.c" />
+    <ClCompile Include="util.c" />
+    <ClCompile Include="VisualUefi.c" />
+    <ClCompile Include="Zydis\src\Decoder.c" />
+    <ClCompile Include="Zydis\src\DecoderData.c" />
+    <ClCompile Include="Zydis\src\Formatter.c" />
+    <ClCompile Include="Zydis\src\FormatterATT.c" />
+    <ClCompile Include="Zydis\src\FormatterBase.c" />
+    <ClCompile Include="Zydis\src\FormatterBuffer.c" />
+    <ClCompile Include="Zydis\src\FormatterIntel.c" />
+    <ClCompile Include="Zydis\src\MetaInfo.c" />
+    <ClCompile Include="Zydis\src\Mnemonic.c" />
+    <ClCompile Include="Zydis\src\Register.c" />
+    <ClCompile Include="Zydis\src\SharedData.c" />
+    <ClCompile Include="Zydis\src\String.c" />
+    <ClCompile Include="Zydis\src\Utils.c" />
+    <ClCompile Include="Zydis\src\Zydis.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Include\Protocol\EfiGuard.h" />
+    <ClInclude Include="arc.h" />
+    <ClInclude Include="EfiGuardDxe.h" />
+    <ClInclude Include="ntdef.h" />
+    <ClInclude Include="pe.h" />
+    <ClInclude Include="util.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Allocator.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Bitset.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Comparison.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Defines.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Format.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\LibC.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Object.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Status.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\String.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Terminal.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Types.h" />
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Vector.h" />
+    <ClInclude Include="Zydis\include\Zydis\Decoder.h" />
+    <ClInclude Include="Zydis\include\Zydis\DecoderTypes.h" />
+    <ClInclude Include="Zydis\include\Zydis\Formatter.h" />
+    <ClInclude Include="Zydis\include\Zydis\MetaInfo.h" />
+    <ClInclude Include="Zydis\include\Zydis\Mnemonic.h" />
+    <ClInclude Include="Zydis\include\Zydis\Register.h" />
+    <ClInclude Include="Zydis\include\Zydis\SharedTypes.h" />
+    <ClInclude Include="Zydis\include\Zydis\ShortString.h" />
+    <ClInclude Include="Zydis\include\Zydis\Status.h" />
+    <ClInclude Include="Zydis\include\Zydis\Utils.h" />
+    <ClInclude Include="Zydis\include\Zydis\Zydis.h" />
+    <ClInclude Include="Zydis\include\Zydis\Internal\DecoderData.h" />
+    <ClInclude Include="Zydis\include\Zydis\Internal\FormatterATT.h" />
+    <ClInclude Include="Zydis\include\Zydis\Internal\FormatterBase.h" />
+    <ClInclude Include="Zydis\include\Zydis\Internal\FormatterIntel.h" />
+    <ClInclude Include="Zydis\include\Zydis\Internal\SharedData.h" />
+    <ClInclude Include="Zydis\include\Zydis\Internal\String.h" />
+  </ItemGroup>
+</Project>

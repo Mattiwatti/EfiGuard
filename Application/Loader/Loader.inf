@@ -1,0 +1,64 @@
+[Defines]
+  INF_VERSION                    = 0x00010019
+  BASE_NAME                      = Loader
+  FILE_GUID                      = FADCFFF6-E60C-4684-A241-B203D6E6686D
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  Loader.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  EfiGuardPkg/EfiGuardPkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  DebugLib
+  UefiLib
+  DevicePathLib
+  PrintLib
+  UefiBootManagerLib
+
+[Guids]
+  ## SOMETIMES_PRODUCES ## Variable:L"BootCurrent" (The boot option of current boot)
+  gEfiGlobalVariableGuid
+  gEfiEventReadyToBootGuid                         ## SOMETIMES_PRODUCES
+  gEfiHobListGuid                                  ## CONSUMES
+  gEfiDxeServicesTableGuid                         ## CONSUMES
+  gEfiFileInfoGuid                                 ## CONSUMES
+
+[Protocols]
+  gEfiGuardDriverProtocolGuid                      ## CONSUMES
+  gEfiLoadedImageProtocolGuid                      ## CONSUMES
+  gEfiDevicePathProtocolGuid                       ## CONSUMES
+  gEfiDevicePathToTextProtocolGuid                 ## CONSUMES
+  gEfiDevicePathUtilitiesProtocolGuid              ## CONSUMES
+  gEfiSimpleFileSystemProtocolGuid                 ## CONSUMES
+  gEfiLoadFileProtocolGuid                         ## CONSUMES
+  gEfiBlockIoProtocolGuid                          ## CONSUMES
+  gEfiRamDiskProtocolGuid                          ## CONSUMES
+  gEfiHiiStringProtocolGuid                        ## CONSUMES
+  gEfiHiiDatabaseProtocolGuid                      ## CONSUMES
+  gEfiHiiConfigRoutingProtocolGuid                 ## CONSUMES
+  gEfiHiiFontProtocolGuid                          ## CONSUMES
+  gEfiHiiImageProtocolGuid                         ## CONSUMES
+  gEfiPciIoProtocolGuid                            ## CONSUMES
+  gEfiUsbIoProtocolGuid                            ## CONSUMES
+  gEfiFirmwareVolume2ProtocolGuid                  ## CONSUMES
+  gEfiSimpleTextInProtocolGuid                     ## CONSUMES
+  gEfiSimpleTextOutProtocolGuid                    ## CONSUMES
+
+[BuildOptions.Common]
+  *:DEBUG_*_*_PP_FLAGS = -D EFI_DEBUG
+  *:DEBUG_*_*_CC_FLAGS = -D EFI_DEBUG
+
+  *:RELEASE_*_*_CC_FLAGS = -D MDEPKG_NDEBUG
+
+[BuildOptions.common.UEFI_APPLICATION]
+  MSFT:*_*_*_DLINK_FLAGS = /SUBSYSTEM:EFI_APPLICATION,1.0
+  INTEL:*_*_*_DLINK_FLAGS = /SUBSYSTEM:EFI_APPLICATION,1.0

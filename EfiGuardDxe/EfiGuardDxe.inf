@@ -1,0 +1,85 @@
+[Defines]
+  INF_VERSION                    = 0x00010019
+  BASE_NAME                      = EfiGuardDxe
+  FILE_GUID                      = 503682AC-F01E-4D10-AAE3-BE5A90A563E7
+  MODULE_TYPE                    = DXE_RUNTIME_DRIVER
+  VERSION_STRING                 = 1.0
+
+  ENTRY_POINT                    = EfiGuardInitialize
+  UNLOAD_IMAGE                   = EfiGuardUnload
+
+[Sources]
+  EfiGuardDxe.c
+  PatchBootmgr.c
+  PatchNtoskrnl.c
+  PatchWinload.c
+  pe.c
+  util.c
+  Zydis/src/Decoder.c
+  Zydis/src/DecoderData.c
+  Zydis/src/MetaInfo.c
+  Zydis/src/Mnemonic.c
+  Zydis/src/Register.c
+  Zydis/src/SharedData.c
+  Zydis/src/String.c
+  Zydis/src/Utils.c
+  Zydis/src/Zydis.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  EfiGuardPkg/EfiGuardPkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  # In EDK2 releases older than UDK2017, gEfiShellProtocolGuid is not in MdePkg but in ShellPkg.
+  # ShellPkg/ShellPkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  DevicePathLib
+  SynchronizationLib
+  MemoryAllocationLib
+  PrintLib
+
+[Protocols]
+  gEfiGuardDriverProtocolGuid                      ## PRODUCES
+  gEfiDriverSupportedEfiVersionProtocolGuid        ## PRODUCES
+  gEfiDevicePathToTextProtocolGuid                 ## CONSUMES
+  gEfiDevicePathUtilitiesProtocolGuid              ## CONSUMES
+  gEfiLoadedImageProtocolGuid                      ## CONSUMES
+  gEfiShellProtocolGuid                            ## SOMETIMES_CONSUMES
+
+[Guids]
+  gEfiGlobalVariableGuid                           ## SOMETIMES_PRODUCES
+  gEfiEventExitBootServicesGuid                    ## CONSUMES
+  gEfiEventVirtualAddressChangeGuid                ## CONSUMES
+  gEfiAcpi20TableGuid                              ## SOMETIMES_CONSUMES
+
+[Depex]
+  gEfiSimpleTextOutProtocolGuid AND
+  gEfiLoadedImageProtocolGuid AND
+  gEfiVariableArchProtocolGuid AND
+  gEfiVariableWriteArchProtocolGuid AND
+  gEfiResetArchProtocolGuid AND
+  gEfiBdsArchProtocolGuid AND
+  gEfiRuntimeArchProtocolGuid
+
+[BuildOptions.Common]
+  # Put Zydis on a diet
+  *_*_*_CC_FLAGS = -D ZYAN_UEFI -D ZYAN_NO_LIBC -D ZYCORE_STATIC_DEFINE -D ZYDIS_STATIC_DEFINE -D ZYDIS_DISABLE_AVX512 -D ZYDIS_DISABLE_KNC -D ZYDIS_DISABLE_FORMATTER
+
+  # This makes the decoder about twice as fast... sorry about the extra 5KB. Oh and usable PDBs please
+  MSFT:RELEASE_*_*_CC_FLAGS = /O2 /Ot /Zi
+  INTEL:RELEASE_*_*_CC_FLAGS = /O3 /Ot /Zi /Qopt-report-embed-
+
+  *:DEBUG_*_*_PP_FLAGS = -D EFI_DEBUG
+  *:DEBUG_*_*_CC_FLAGS = -D EFI_DEBUG
+
+  *:RELEASE_*_*_CC_FLAGS = -D MDEPKG_NDEBUG
+
+[BuildOptions.common.DXE_RUNTIME_DRIVER]
+  MSFT:*_*_*_DLINK_FLAGS = /SUBSYSTEM:EFI_RUNTIME_DRIVER,1.0
+  INTEL:*_*_*_DLINK_FLAGS = /SUBSYSTEM:EFI_RUNTIME_DRIVER,1.0

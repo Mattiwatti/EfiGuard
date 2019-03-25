@@ -1,0 +1,18 @@
+[Defines]
+  DEC_SPECIFICATION              = 0x00010019
+  PACKAGE_NAME                   = EfiGuardPkg
+  PACKAGE_GUID                   = 6BFA833B-A9DF-490D-AF7E-7F92A80E3F9A
+  PACKAGE_VERSION                = 1.00
+
+[Includes]
+  Include
+  Include/Protocol
+  EfiGuardDxe
+  EfiGuardDxe/Zydis/dependencies/zycore/include
+  EfiGuardDxe/Zydis/include
+  EfiGuardDxe/Zydis/src
+  EfiGuardDxe/Zydis/msvc
+
+[Protocols]
+  ## Include/Protocol/EfiGuard.h
+  gEfiGuardDriverProtocolGuid    = { 0x51e4785b, 0xb1e4, 0x4fda, { 0xaf, 0x5f, 0x94, 0x2e, 0xc0, 0x15, 0xf1, 0x7 }}

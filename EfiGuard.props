@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <EDK_PATH>$(SolutionDir)..</EDK_PATH>
+  </PropertyGroup>
+  <PropertyGroup>
+    <GenerateManifest />
+    <IntDir>obj\$(Platform)-$(Configuration)\</IntDir>
+    <TargetExt>.efi</TargetExt>
+    <IncludePath>$(EDK_PATH)\MdePkg\Include;$(EDK_PATH)\MdePkg\Include\X64;$(EDK_PATH)\MdeModulePkg\Include;$(EDK_PATH)\ShellPkg\Include</IncludePath>
+    <LibraryPath>$(SolutionDir)..\..\VisualUefi\EDK-II\$(Platform)\$(Configuration)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Label="Globals">
+    <WindowsTargetPlatformVersion>$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LocalDebuggerCommand>$(SolutionDir)..\..\VisualUefi\debugger\qemu.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommandArguments>-name "VisualUEFI Debugger" -drive file=OVMF_CODE-need-smm.fd,if=pflash,format=raw,unit=0,readonly=on -drive file=OVMF_VARS-need-smm.fd,if=pflash,format=raw,unit=1 -drive file=fat:rw:$(OutDir),media=disk,if=virtio,format=raw -drive file=UefiShell.iso,format=raw -m 512 -machine q35,smm=on -nodefaults -vga std -global driver=cfi.pflash01,property=secure,value=on -global ICH9-LPC.disable_s3=1</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\..\VisualUefi\debugger</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerDebuggerType>Script</LocalDebuggerDebuggerType>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>VISUALUEFI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <OmitFramePointers>true</OmitFramePointers>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <ExceptionHandling>false</ExceptionHandling>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <ForcedIncludeFiles>$(SolutionDir)..\..\VisualUefi\EDK-II\BaseLib\vshacks.h</ForcedIncludeFiles>
+      <CallingConvention />
+      <TreatWChar_tAsBuiltInType />
+      <StringPooling>true</StringPooling>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <ForceConformanceInForLoopScope />
+      <AdditionalOptions>/Gs32768 /Gw %(AdditionalOptions)</AdditionalOptions>
+      <ErrorReporting />
+      <FloatingPointModel />
+      <DiagnosticsFormat>Caret</DiagnosticsFormat>
+    </ClCompile>
+    <Link>
+      <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
+      <AdditionalDependencies>UefiHiiLib.lib;UefiHiiServicesLib.lib;UefiSortLib.lib;UefiShellLib.lib;GlueLib.lib;BaseLib.lib;BaseDebugPrintErrorLevelLib.lib;BasePrintLib.lib;UefiLib.lib;UefiBootServicesTableLib.lib;UefiRuntimeServicesTableLib.lib;UefiDevicePathLibDevicePathProtocol.lib;UefiDebugLibConOut.lib;UefiMemoryLib.lib;UefiMemoryAllocationLib.lib;BaseSynchronizationLib.lib;UefiFileHandleLib.lib</AdditionalDependencies>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <SubSystem>EFI Boot Service Driver</SubSystem>
+      <Driver>Driver</Driver>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding />
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <BaseAddress>0</BaseAddress>
+      <SectionAlignment>4096</SectionAlignment>
+      <SetChecksum>true</SetChecksum>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <RandomizedBaseAddress />
+      <DataExecutionPrevention />
+      <ManifestFile />
+      <AllowIsolation />
+      <EnableUAC />
+      <UACExecutionLevel />
+      <UACUIAccess />
+      <TypeLibraryResourceID />
+      <AdditionalOptions>/SECTION:.xdata,D /SECTION:.pdata,D /OPT:ICF=10 /IGNORE:4254 /IGNORE:4281 /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <MergeSections>.rdata=.text</MergeSections>
+      <LinkErrorReporting />
+      <ProfileGuidedDatabase />
+      <EntryPointSymbol>EfiMain</EntryPointSymbol>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <BuildMacro Include="EDK_PATH">
+      <Value>$(EDK_PATH)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
