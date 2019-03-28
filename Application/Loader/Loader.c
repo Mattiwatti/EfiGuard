@@ -90,7 +90,7 @@ PromptInput(
 			break;
 	}
 
-	Print(L"%c\n\n", SelectedChar);
+	Print(L"%c\r\n\r\n", SelectedChar);
 	return SelectedChar;
 }
 

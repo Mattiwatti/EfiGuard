@@ -633,7 +633,7 @@ PatchNtoskrnl(
 								InitSection,
 								BuildNumber);
 	if (EFI_ERROR(Status))
-		goto Exit;
+		return Status;
 
 	PRINT_KERNEL_PATCH_MSG(L"\r\n[PatchNtoskrnl] Successfully disabled PatchGuard.\r\n");
 
@@ -650,12 +650,11 @@ PatchNtoskrnl(
 							gDriverConfig.DseBypassMethod,
 							BuildNumber);
 		if (EFI_ERROR(Status))
-			goto Exit;
+			return Status;
 
 		if (gDriverConfig.DseBypassMethod == DSE_DISABLE_AT_BOOT)
 			PRINT_KERNEL_PATCH_MSG(L"\r\n[PatchNtoskrnl] Successfully disabled DSE.\r\n");
 	}
 
-Exit:
 	return Status;
 }
