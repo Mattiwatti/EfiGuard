@@ -111,10 +111,12 @@ _vsnwprintf(
 	);
 
 NTSYSAPI
-int
+ULONG
 __cdecl
-_wtoi(
-	_In_ PCWCHAR Str
+wcstoul(
+	_In_ PCWCHAR String,
+	_Out_opt_ PWCHAR* EndPtr,
+	_In_ LONG Radix
 	);
 
 // Console functions

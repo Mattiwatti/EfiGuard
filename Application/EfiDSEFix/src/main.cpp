@@ -21,7 +21,9 @@ PrintUsage(
 int wmain(int argc, wchar_t** argv)
 {
 	NT_ASSERT(argc != 0);
-	if (argc == 1 || argc > 3 || (argc == 3 && _wtoi(argv[2]) == 0))
+
+	if (argc == 1 || argc > 3 ||
+		(argc == 3 && wcstoul(argv[2], nullptr, 16) == 0))
 	{
 		// Print help text
 		PrintUsage(argv[0]);
@@ -50,7 +52,7 @@ int wmain(int argc, wchar_t** argv)
 	{
 		if (NtCurrentPeb()->OSBuildNumber >= 9200)
 		{
-			CiOptionsValue = argc == 3 ? static_cast<ULONG>(_wtoi(argv[2])) : CODEINTEGRITY_OPTION_ENABLED;
+			CiOptionsValue = argc == 3 ? wcstoul(argv[2], nullptr, 16) : CODEINTEGRITY_OPTION_ENABLED;
 			Printf(L"(Re)enabling DSE [g_CiOptions value = 0x%X]...\n", CiOptionsValue);
 		}
 		else
