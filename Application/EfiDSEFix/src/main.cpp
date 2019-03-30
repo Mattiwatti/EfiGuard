@@ -52,7 +52,7 @@ int wmain(int argc, wchar_t** argv)
 	{
 		if (NtCurrentPeb()->OSBuildNumber >= 9200)
 		{
-			CiOptionsValue = argc == 3 ? wcstoul(argv[2], nullptr, 16) : CODEINTEGRITY_OPTION_ENABLED;
+			CiOptionsValue = argc == 3 ? wcstoul(argv[2], nullptr, 16) : 0x6;
 			Printf(L"(Re)enabling DSE [g_CiOptions value = 0x%X]...\n", CiOptionsValue);
 		}
 		else
