@@ -12,7 +12,7 @@
     <LibraryPath>$(SolutionDir)..\..\VisualUefi\EDK-II\$(Platform)\$(Configuration)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Label="Globals">
-    <WindowsTargetPlatformVersion>$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup>
     <LocalDebuggerCommand>$(SolutionDir)..\..\VisualUefi\debugger\qemu.exe</LocalDebuggerCommand>
