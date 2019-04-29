@@ -34,7 +34,7 @@ There are two ways to use EfiGuard: booting the loader (easiest), or using the U
 5. If you booted with the `SetVariable` hook (the default), run `EfiDSEFix.exe -d` from a command prompt after boot to disable DSE. Run `EfiDSEFix.exe` to see the full list of options.
 
 ## Using the UEFI shell to load the driver
-1. Follow the steps 1 and 2 as above, but do not rename the loader to `bootx64.efi`. Instead, either use the BIOS-provided shell (if you have one), or download the [EDK2 UEFI Shell](https://github.com/tianocore/edk2/blob/master/ShellBinPkg/UefiShell/X64/Shell.efi?raw=true) and rename it to `bootx64.efi`.
+1. Follow the steps 1 and 2 as above, but do not rename the loader to `bootx64.efi`. Instead, either use the BIOS-provided shell (if you have one), or download the [EDK2 UEFI Shell](https://github.com/tianocore/edk2/blob/edk2-stable201903/ShellBinPkg/UefiShell/X64/Shell.efi?raw=true) and rename it to `bootx64.efi`.
 2. Boot the machine to the UEFI shell.
 3. `cd` to `/EFI/Boot` on the correct filesystem and run `load EfiGuardDxe.efi` to load the driver.
 4. (Optional) Run either `Loader.efi` or `Loader.config.efi` from the same directory to boot Windows. You can also continue working in the shell, or `exit` to go back to the BIOS/boot menu and boot from there.
