@@ -242,7 +242,11 @@ typedef enum _TYPE_OF_MEMORY {
 	LoaderFirmwareKsr,									// 22
 	LoaderEnclaveKsr,									// 23
 	LoaderSkMemory,										// 24
-	LoaderMaximum										// 25
+	LoaderSkFirmwareReserved,							// 25
+	LoaderIoSpaceMemoryZeroed,							// 26
+	LoaderIoSpaceMemoryFree,							// 27
+	LoaderIoSpaceMemoryKsr,								// 28
+	LoaderMaximum,										// 29
 } TYPE_OF_MEMORY;
 
 typedef struct _MEMORY_ALLOCATION_DESCRIPTOR {
@@ -321,7 +325,14 @@ typedef struct _LOADER_PERFORMANCE_DATA {
 	UINT64 LaunchHypervisorTime;
 	UINT64 LoadVsmTime;
 	UINT64 LaunchVsmTime;
+
+	//
+	// Below added in 10.0.18362.0
+	//
+	UINT64 ExecuteTransitionStartTime;
+	UINT64 ExecuteTransitionEndTime;
 	UINT64 LoadDriversTime;
+	UINT64 CleanupVsmTime;
 } LOADER_PERFORMANCE_DATA, *PLOADER_PERFORMANCE_DATA;
 
 //
@@ -571,6 +582,13 @@ typedef struct _LOADER_RESET_REASON {
 	} Basic;
 	UINT32 AdditionalInfo[8];
 } LOADER_RESET_REASON, *PLOADER_RESET_REASON;
+
+//
+// Since 10.0.18362.0
+//
+typedef struct _VSM_PERFORMANCE_DATA {
+	UINT64 LaunchVsmMark[8];
+} VSM_PERFORMANCE_DATA, *PVSM_PERFORMANCE_DATA;
 
 typedef struct _LOADER_HIVE_RECOVERY_INFO {
 	struct {
@@ -1013,6 +1031,21 @@ typedef struct _LOADER_PARAMETER_EXTENSION {
 	// Below field added in 10.0.17763.0
 	//
 	UINT32 FeatureSettings;
+
+	//
+	// Below fields added in 10.0.18362.0
+	//
+	UINT32 HotPatchReserveSize;
+
+	UINT32 RetpolineReserveSize;
+
+	struct
+	{
+		VOID* CodeBase;
+		UINTN CodeSize;
+	} MiniExecutive;
+
+	VSM_PERFORMANCE_DATA VsmPerformanceData;
 } LOADER_PARAMETER_EXTENSION, *PLOADER_PARAMETER_EXTENSION;
 
 struct _HEADLESS_LOADER_BLOCK;
