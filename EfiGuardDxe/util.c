@@ -151,7 +151,7 @@ FindPattern(
 	IN CONST UINT8* Pattern,
 	IN UINT8 Wildcard,
 	IN UINT32 PatternLength,
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN UINT32 Size,
 	OUT VOID **Found
 	)
@@ -188,7 +188,7 @@ FindPatternVerbose(
 	IN CONST UINT8* Pattern,
 	IN UINT8 Wildcard,
 	IN UINT32 PatternLength,
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN UINT32 Size,
 	OUT VOID **Found
 	)

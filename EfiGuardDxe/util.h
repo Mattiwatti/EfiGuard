@@ -73,7 +73,7 @@ FindPattern(
 	IN CONST UINT8* Pattern,
 	IN UINT8 Wildcard,
 	IN UINT32 PatternLength,
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN UINT32 Size,
 	OUT VOID **Found
 	);
@@ -87,7 +87,7 @@ FindPatternVerbose(
 	IN CONST UINT8* Pattern,
 	IN UINT8 Wildcard,
 	IN UINT32 PatternLength,
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN UINT32 Size,
 	OUT VOID **Found
 	);
@@ -110,7 +110,7 @@ ZydisInit(
 //
 // Finds the start of a function given an address within it, scanning downwards.
 // Returns NULL if StartAddress is NULL (this simplifies error checking logic in calling functions).
-// Returns NULL is LowerBound is reached and no function boundary was found.
+// Returns NULL if LowerBound is reached and no function boundary was found.
 //
 UINT8*
 EFIAPI

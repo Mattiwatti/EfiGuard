@@ -178,14 +178,14 @@ typedef struct _VS_VERSIONINFO
 PEFI_IMAGE_NT_HEADERS
 EFIAPI
 RtlpImageNtHeaderEx(
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN UINTN Size OPTIONAL
 	);
 
 INPUT_FILETYPE
 EFIAPI
 GetInputFileType(
-	IN UINT8 *ImageBase,
+	IN CONST UINT8 *ImageBase,
 	IN UINTN ImageSize
 	);
 
@@ -200,7 +200,7 @@ EFIAPI
 GetProcedureAddress(
 	IN UINTN DllBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
-	IN CHAR8* RoutineName
+	IN CONST CHAR8* RoutineName
 	);
 
 EFI_STATUS
@@ -223,7 +223,7 @@ RvaToOffset(
 VOID*
 EFIAPI
 RtlpImageDirectoryEntryToDataEx(
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN BOOLEAN MappedAsImage,
 	IN UINT16 DirectoryEntry,
 	OUT UINT32 *Size
@@ -232,7 +232,7 @@ RtlpImageDirectoryEntryToDataEx(
 EFI_STATUS
 EFIAPI
 FindResourceDataById(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN UINT16 TypeId,
 	IN UINT16 NameId,
 	IN UINT16 LanguageId OPTIONAL,
@@ -243,7 +243,7 @@ FindResourceDataById(
 EFI_STATUS
 EFIAPI
 GetPeFileVersionInfo(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	OUT UINT16* MajorVersion OPTIONAL,
 	OUT UINT16* MinorVersion OPTIONAL,
 	OUT UINT16* BuildNumber OPTIONAL,

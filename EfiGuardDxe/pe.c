@@ -29,7 +29,7 @@ RtlIsCanonicalAddress(
 PEFI_IMAGE_NT_HEADERS
 EFIAPI
 RtlpImageNtHeaderEx(
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN UINTN Size OPTIONAL
 	)
 {
@@ -64,7 +64,7 @@ RtlpImageNtHeaderEx(
 INPUT_FILETYPE
 EFIAPI
 GetInputFileType(
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN UINTN ImageSize
 	)
 {
@@ -85,7 +85,7 @@ GetInputFileType(
 		// Of the Windows loaders, only bootmgfw.efi has this subsystem type.
 		// Check for the BCD Bootmgr GUID, { 9DEA862C-5CDD-4E70-ACC1-F32B344D4795 }, which is present in bootmgfw/bootmgr (and on Win >= 8 also winload.[exe|efi])
 		CONST EFI_GUID BcdWindowsBootmgrGuid = { 0x9dea862c, 0x5cdd, 0x4e70, { 0xac, 0xc1, 0xf3, 0x2b, 0x34, 0x4d, 0x47, 0x95 } };
-		for (UINT8* Address = ImageBase; Address < ImageBase + ImageSize - sizeof(BcdWindowsBootmgrGuid); Address += sizeof(VOID*))
+		for (UINT8* Address = (UINT8*)ImageBase; Address < ImageBase + ImageSize - sizeof(BcdWindowsBootmgrGuid); Address += sizeof(VOID*))
 		{
 			if (CompareGuid((CONST GUID*)Address, &BcdWindowsBootmgrGuid))
 			{
@@ -162,7 +162,7 @@ EFIAPI
 GetProcedureAddress(
 	IN UINTN DllBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
-	IN CHAR8* RoutineName
+	IN CONST CHAR8* RoutineName
 	)
 {
 	if (DllBase == 0 || NtHeaders == NULL)
@@ -336,7 +336,7 @@ RvaToOffset(
 VOID*
 EFIAPI
 RtlpImageDirectoryEntryToDataEx(
-	IN VOID* Base,
+	IN CONST VOID* Base,
 	IN BOOLEAN MappedAsImage,
 	IN UINT16 DirectoryEntry,
 	OUT UINT32 *Size
@@ -383,7 +383,7 @@ RtlpImageDirectoryEntryToDataEx(
 EFI_STATUS
 EFIAPI
 FindResourceDataById(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN UINT16 TypeId,
 	IN UINT16 NameId,
 	IN UINT16 LanguageId OPTIONAL,
@@ -456,7 +456,7 @@ FindResourceDataById(
 EFI_STATUS
 EFIAPI
 GetPeFileVersionInfo(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	OUT UINT16* MajorVersion OPTIONAL,
 	OUT UINT16* MinorVersion OPTIONAL,
 	OUT UINT16* BuildNumber OPTIONAL,

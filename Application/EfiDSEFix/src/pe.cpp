@@ -113,7 +113,7 @@ MapFileSectionView(
 PVOID
 GetProcedureAddress(
 	_In_ ULONG_PTR DllBase,
-	_In_ PCSTR RoutineName
+	_In_ PCCH RoutineName
 	)
 {
 	// Find and verify PE headers

@@ -11,7 +11,7 @@
 
 #if defined(__RESHARPER__)
 #define WPRINTF_ATTR(FormatIndex, FirstToCheck) \
-    [[rscpp::format(wprintf, FormatIndex, FirstToCheck)]]
+	[[rscpp::format(wprintf, FormatIndex, FirstToCheck)]]
 #else
 #define WPRINTF_ATTR(FormatIndex, FirstToCheck)
 #endif
@@ -47,7 +47,7 @@ MapFileSectionView(
 PVOID
 GetProcedureAddress(
 	_In_ ULONG_PTR DllBase,
-	_In_ PCSTR RoutineName
+	_In_ PCCH RoutineName
 	);
 
 FORCEINLINE
@@ -131,7 +131,7 @@ Printf(
 	WCHAR Buffer[512];
 	va_list VaList;
 	va_start(VaList, Format);
-	ULONG N = _vsnwprintf(Buffer, sizeof(Buffer), Format, VaList);
+	ULONG N = _vsnwprintf(Buffer, sizeof(Buffer) / sizeof(WCHAR) - 1, Format, VaList);
 	WriteConsoleW(NtCurrentPeb()->ProcessParameters->StandardOutput, Buffer, N, &N, NULL);
 	va_end(VaList);
 }
