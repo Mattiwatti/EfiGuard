@@ -581,7 +581,7 @@ PatchWinload(
 	{
 		CHAR8 SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME + 1];
 		CopyMem(SectionName, Section->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
-		SectionName[MAX(sizeof(".text"), sizeof(".rdata"))] = '\0';
+		SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME] = '\0';
 
 		if (AsciiStrCmp(SectionName, ".text") == 0)
 			CodeSection = Section;

@@ -612,7 +612,7 @@ PatchNtoskrnl(
 	{
 		CHAR8 SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME + 1];
 		CopyMem(SectionName, Section->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
-		SectionName[MAX(sizeof("PAGE"), sizeof("INIT"))] = '\0'; // Null terminate so we don't match lookalikes like INITDATA and PAGEVRFY
+		SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME] = '\0';
 
 		if (AsciiStrCmp(SectionName, "INIT") == 0)
 			InitSection = Section;
