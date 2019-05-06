@@ -16,6 +16,15 @@ EFI_DRIVER_SUPPORTED_EFI_VERSION_PROTOCOL gEfiGuardSupportedEfiVersion =
 };
 
 //
+// Driver unload
+//
+EFI_STATUS
+EFIAPI
+EfiGuardUnload(
+	IN EFI_HANDLE ImageHandle
+	);
+
+//
 // EfiGuard driver protocol
 //
 EFI_STATUS
@@ -204,6 +213,11 @@ HookedLoadImage(
 				PatchBootManager(FileType,
 								LoadedImage->ImageBase,
 								LoadedImage->ImageSize);
+			}
+			else
+			{
+				// A non-Windows OS is being booted. Unload ourselves
+				EfiGuardUnload(gImageHandle);
 			}
 		}
 	}
