@@ -20,8 +20,8 @@ extern "C" {
 #undef WIN32_NO_STATUS
 #include <intrin.h>
 
-#define NT_SUCCESS(Status)				((NTSTATUS)(Status) >= 0)
-#define NT_ERROR(Status)				((((ULONG)(Status)) >> 30) == 3)
+#define NT_SUCCESS(Status)			((NTSTATUS)(Status) >= 0)
+#define NT_ERROR(Status)			((((ULONG)(Status)) >> 30) == 3)
 
 #define FASTCALL __fastcall
 
@@ -29,12 +29,16 @@ extern "C" {
 #define _Reserved_
 #endif
 
-#if defined(__clang__)
+#if (defined(_MSC_VER) && (_MSC_VER >= 1800)) || defined(__clang__)
+#if (!defined(__RESHARPER__)) && (!defined(__INTELLISENSE__))
 #undef FIELD_OFFSET
 #undef UFIELD_OFFSET
-#define FIELD_OFFSET(type, field)	((LONG)__builtin_offsetof(type, field))
-#define UFIELD_OFFSET(type, field)	((ULONG)__builtin_offsetof(type, field))
+#define FIELD_OFFSET(type, field)	((LONG)(LONG_PTR)__builtin_offsetof(type, field))
+#define UFIELD_OFFSET(type, field)	((ULONG)(LONG_PTR)__builtin_offsetof(type, field))
 #endif
+#endif
+
+#define PAGE_SIZE					0x1000
 
 #define ALIGN_DOWN(length, type) \
 	((ULONG_PTR)(length) & ~(sizeof(type) - 1))
@@ -45,8 +49,7 @@ extern "C" {
 #define MIN(a,b)	(((a) < (b)) ? (a) : (b))
 #define MAX(a,b)	(((a) > (b)) ? (a) : (b))
 
-typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
-typedef NTSTATUS *PNTSTATUS;
+typedef _Return_type_success_(return >= 0) LONG NTSTATUS, *PNTSTATUS;
 typedef LONG KPRIORITY, *PKPRIORITY;
 typedef ULONG LOGICAL, *PLOGICAL;
 
@@ -674,6 +677,22 @@ typedef struct _IMAGE_INFO
 	SIZE_T	ImageSize;
 	ULONG	ImageSectionNumber;
 } IMAGE_INFO, *PIMAGE_INFO;
+
+typedef struct _PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION
+{
+	ULONG Version; // Set to 0 for x64, 1 for native x86, and use as PVOID Callback on WOW64
+	ULONG Reserved;
+	PVOID Callback;
+} PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION, *PPROCESS_INSTRUMENTATION_CALLBACK_INFORMATION;
+
+typedef struct _THREAD_LAST_SYSCALL_INFORMATION
+{
+	PVOID FirstArgument;
+	USHORT SystemCallNumber;
+#if NTDDI_VERSION >= NTDDI_WINBLUE
+	ULONG64 WaitTime; // may be omitted
+#endif
+} THREAD_LAST_SYSCALL_INFORMATION, *PTHREAD_LAST_SYSCALL_INFORMATION;
 
 typedef struct _OBJECT_ATTRIBUTES {
 	ULONG Length;
@@ -2594,6 +2613,15 @@ typedef struct _SYSTEM_BASIC_INFORMATION
 	CCHAR NumberOfProcessors;
 } SYSTEM_BASIC_INFORMATION, *PSYSTEM_BASIC_INFORMATION;
 
+typedef struct _SYSTEM_PROCESSOR_INFORMATION
+{
+	USHORT ProcessorArchitecture;
+	USHORT ProcessorLevel;
+	USHORT ProcessorRevision;
+	USHORT MaximumProcessors;
+	ULONG ProcessorFeatureBits;
+} SYSTEM_PROCESSOR_INFORMATION, *PSYSTEM_PROCESSOR_INFORMATION;
+
 typedef struct _FILE_PIPE_PEEK_BUFFER
 {
 	ULONG NamedPipeState;
@@ -2829,8 +2857,6 @@ typedef ULONG GDI_HANDLE_BUFFER32[GDI_HANDLE_BUFFER_SIZE32];
 typedef ULONG GDI_HANDLE_BUFFER64[GDI_HANDLE_BUFFER_SIZE64];
 typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
 
-#define FLS_MAXIMUM_AVAILABLE 128
-#define TLS_MINIMUM_AVAILABLE 64
 #define TLS_EXPANSION_SLOTS 1024
 
 typedef struct _PEB_LDR_DATA
@@ -3649,6 +3675,14 @@ typedef struct _SYSTEM_EXTENDED_THREAD_INFORMATION
 													WORKER_FACTORY_READY_WORKER | \
 													WORKER_FACTORY_SHUTDOWN)
 
+typedef struct _WORKER_FACTORY_DEFERRED_WORK
+{
+	struct _PORT_MESSAGE* AlpcSendMessage;
+	HANDLE AlpcSendMessagePort;
+	ULONG AlpcSendMessageFlags;
+	ULONG Flags;
+} WORKER_FACTORY_DEFERRED_WORK, *PWORKER_FACTORY_DEFERRED_WORK;
+
 #define NtCurrentProcess		((HANDLE)(LONG_PTR)-1)
 #define NtCurrentThread			((HANDLE)(LONG_PTR)-2)
 #define NtCurrentPeb()			(NtCurrentTeb()->ProcessEnvironmentBlock)
@@ -4448,6 +4482,19 @@ NtUnmapViewOfSection(
 	_In_opt_ PVOID BaseAddress
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN8
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtUnmapViewOfSectionEx(
+	_In_ HANDLE ProcessHandle,
+	_In_opt_ PVOID BaseAddress,
+	_In_ ULONG Flags
+	);
+
+#endif
+
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -5161,6 +5208,25 @@ NtCreateSection(
 	_In_opt_ HANDLE FileHandle
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN10_RS5
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtCreateSectionEx(
+	_Out_ PHANDLE SectionHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_opt_ PLARGE_INTEGER MaximumSize,
+	_In_ ULONG SectionPageProtection,
+	_In_ ULONG AllocationAttributes,
+	_In_opt_ HANDLE FileHandle,
+	_Inout_updates_opt_(ExtendedParameterCount) PMEM_EXTENDED_PARAMETER ExtendedParameters,
+	_In_ ULONG ExtendedParameterCount
+	);
+
+#endif
+
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -5185,6 +5251,25 @@ NtMapViewOfSection(
 	_In_ ULONG AllocationType,
 	_In_ ULONG Win32Protect
 	);
+
+#if NTDDI_VERSION >= NTDDI_WIN10_RS4
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtMapViewOfSectionEx(
+	_In_ HANDLE SectionHandle,
+	_In_ HANDLE ProcessHandle,
+	_Inout_opt_ PVOID* BaseAddress,
+	_In_ PLARGE_INTEGER ViewOffset,
+	_Inout_ PSIZE_T ViewSize,
+	_In_ ULONG AllocationType,
+	_In_ ULONG Win32Protect,
+	_Inout_updates_opt_(ParameterCount) PMEM_EXTENDED_PARAMETER ExtendedParameters,
+	_In_ ULONG ParameterCount
+	);
+
+#endif
 
 #if NTDDI_VERSION >= NTDDI_VISTA
 NTSYSCALLAPI
@@ -5625,7 +5710,7 @@ NtCreateKey(
 	_Out_opt_ PULONG Disposition
 	);
 
-#if NTDDI_VERSION >= PNTDDI_VISTA
+#if NTDDI_VERSION >= NTDDI_VISTA
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -5650,7 +5735,7 @@ NtOpenKey(
 	_In_ POBJECT_ATTRIBUTES ObjectAttributes
 	);
 
-#if NTDDI_VERSION >= PNTDDI_VISTA
+#if NTDDI_VERSION >= NTDDI_VISTA
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -5989,7 +6074,7 @@ NtLockProductActivationKeys(
 	_Out_opt_ ULONG *pSafeMode
 	);
 
-#if NTDDI_VERSION >= PNTDDI_VISTA
+#if NTDDI_VERSION >= NTDDI_VISTA
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -7039,25 +7124,22 @@ NTAPI
 NtWorkerFactoryWorkerReady(
 	_In_ HANDLE WorkerFactoryHandle
 	);
-#endif
 
-#if NTDDI_VERSION >= NTDDI_VISTA
 #if NTDDI_VERSION >= NTDDI_WIN8 || defined(_WIN64)
-// Windows 8+ declaration, can be used on Win 7 x64
+// Windows 8+ declaration, can be used on Vista/7 x64
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtWaitForWorkViaWorkerFactory(
 	_In_ HANDLE WorkerFactoryHandle,
-	_Out_ PFILE_IO_COMPLETION_INFORMATION *MiniPacket,
-	_In_ ULONG NumberOfMiniPackets,
-	_Out_ PULONG NumberOfMiniPacketsReturned,
-	_In_opt_ PHANDLE Handles,
-	_In_ PULONG Flags
+	_Out_writes_to_(Count, *PacketsReturned) PFILE_IO_COMPLETION_INFORMATION MiniPackets,
+	_In_ ULONG Count,
+	_Out_ PULONG PacketsReturned,
+	_In_ PWORKER_FACTORY_DEFERRED_WORK DeferredWork
 	);
 #else
-// Allow Windows 7 x86 to link (import @8 instead of @20) and run without stack corruption
-// If you're using one of the new shitty Windows versions on x86 you should use the other declaration
+// Allow Windows Vista/7 x86 to link (import @8 decorated stdcall name from ntdll.lib instead of @20)
+// If you're using one of the new shitty Windows versions on x86 you should use the other declaration or make a typedef
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -7070,18 +7152,18 @@ FORCEINLINE
 NTSTATUS
 NtWaitForWorkViaWorkerFactory(
 	_In_ HANDLE WorkerFactoryHandle,
-	_Out_ PFILE_IO_COMPLETION_INFORMATION MiniPacket,
+	_Out_ PFILE_IO_COMPLETION_INFORMATION MiniPackets,
 	_Reserved_ ULONG Count,
-	_Reserved_ PULONG NumEntriesRemoved,
-	_Reserved_ PLARGE_INTEGER Unknown
+	_Reserved_ PULONG PacketsReturned,
+	_Reserved_ PWORKER_FACTORY_DEFERRED_WORK DeferredWork
 	)
 {
 	UNREFERENCED_PARAMETER(Count);
-	UNREFERENCED_PARAMETER(NumEntriesRemoved);
-	UNREFERENCED_PARAMETER(Unknown);
+	UNREFERENCED_PARAMETER(PacketsReturned);
+	UNREFERENCED_PARAMETER(DeferredWork);
 
 	return ZwWaitForWorkViaWorkerFactory(WorkerFactoryHandle,
-										MiniPacket);
+										MiniPackets);
 }
 #endif
 #endif
@@ -8370,6 +8452,21 @@ RtlSetEnvironmentStrings(
 	);
 #endif
 
+#if NTDDI_VERSION >= NTDDI_VISTA
+NTSYSAPI
+HANDLE
+NTAPI
+RtlGetCurrentTransaction(
+	);
+
+NTSYSAPI
+LOGICAL
+NTAPI
+RtlSetCurrentTransaction(
+	_In_ HANDLE TransactionHandle
+	);
+#endif
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -8660,7 +8757,7 @@ NTAPI
 RtlGetFullPathName_U(
 	_In_ PWSTR FileName,
 	_In_ ULONG BufferLength,
-	_Out_ PWSTR Buffer,
+	_Out_writes_bytes_(BufferLength) PWSTR Buffer,
 	_Out_opt_ PWSTR *FilePart
 	);
 
@@ -8673,7 +8770,7 @@ RtlGetFullPathName_UEx(
 	_In_ ULONG BufferLength,
 	_Out_writes_bytes_(BufferLength) PWSTR Buffer,
 	_Out_opt_ PWSTR *FilePart,
-	_Out_opt_ RTL_PATH_TYPE *InputPathType
+	_Out_opt_ ULONG *BytesRequired
 	);
 #endif
 
@@ -8683,13 +8780,13 @@ NTSTATUS
 NTAPI
 RtlGetFullPathName_UstrEx(
 	_In_ PUNICODE_STRING FileName,
-	_In_opt_ PUNICODE_STRING StaticString,
-	_In_opt_ PUNICODE_STRING DynamicString,
+	_Inout_ PUNICODE_STRING StaticString,
+	_Out_opt_ PUNICODE_STRING DynamicString,
 	_Out_opt_ PUNICODE_STRING *StringUsed,
-	_Out_opt_ PSIZE_T FilePartSize,
+	_Out_opt_ SIZE_T *FilePartPrefixCch,
 	_Out_opt_ PBOOLEAN NameInvalid,
-	_Out_ RTL_PATH_TYPE* PathType,
-	_Out_opt_ PSIZE_T LengthNeeded
+	_Out_ RTL_PATH_TYPE *InputPathType,
+	_Out_opt_ SIZE_T *BytesRequired
 	);
 #endif
 
