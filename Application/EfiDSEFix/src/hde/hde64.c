@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Hacker Disassembler Engine 64 C
  * Copyright (c) 2008-2009, Vyacheslav Patkov.
  * All rights reserved.
@@ -7,15 +7,13 @@
 
 #include "hde64.h"
 #include "table64.h"
-
-#pragma warning(push)
-#pragma warning(disable:4701)
-#pragma warning(disable:4706)
+#include <intrin.h>
 
 unsigned int hde64_disasm(const void *code, hde64s *hs)
 {
     uint8_t x, c = 0, *p = (uint8_t *)code, cflags, opcode, pref = 0;
-    uint8_t *ht = hde64_table, m_mod, m_reg, m_rm, disp_size = 0;
+    const uint8_t* ht = hde64_table;
+    uint8_t m_mod, m_reg, m_rm, disp_size = 0;
     uint8_t op64 = 0;
 
     // Avoid using memset to reduce the footprint.
@@ -64,7 +62,7 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
 
     if ((c & 0xf0) == 0x40) {
         hs->flags |= F_PREFIX_REX;
-        if ((hs->rex_w = (c & 0xf) >> 3) && (*p & 0xf8) == 0xb8)
+        if (((hs->rex_w = (c & 0xf) >> 3)) && (*p & 0xf8) == 0xb8)
             op64++;
         hs->rex_r = (c & 7) >> 2;
         hs->rex_x = (c & 3) >> 1;
@@ -138,7 +136,8 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
             if (m_mod == 3) {
                 hs->flags |= F_ERROR | F_ERROR_LOCK;
             } else {
-                uint8_t *table_end, op = opcode;
+                const uint8_t* table_end;
+                uint8_t op = opcode;
                 if (hs->opcode2) {
                     ht = hde64_table + DELTA_OP2_LOCK_OK;
                     table_end = ht + DELTA_OP_ONLY_MEM - DELTA_OP2_LOCK_OK;
@@ -174,6 +173,8 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
                         goto error_operand;
                     else
                         goto no_error_operand;
+                default:
+                    break;
             }
         } else {
             switch (opcode) {
@@ -187,11 +188,13 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
                         goto error_operand;
                     else
                         goto no_error_operand;
+                default:
+                    break;
             }
         }
 
         if (m_mod == 3) {
-            uint8_t *table_end;
+            const uint8_t *table_end;
             if (hs->opcode2) {
                 ht = hde64_table + DELTA_OP2_ONLY_MEM;
                 table_end = ht + sizeof(hde64_table) - DELTA_OP2_ONLY_MEM;
@@ -219,6 +222,8 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
                     break;
                 case 0xc5:
                     goto error_operand;
+                default:
+                    break;
             }
             goto no_error_operand;
         } else
@@ -252,6 +257,8 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
                 disp_size = 2;
                 if (!(pref & PRE_67))
                     disp_size <<= 1;
+            default:
+                break;
         }
 
         if (m_mod != 3 && m_rm == 4) {
@@ -277,6 +284,8 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
             case 4:
                 hs->flags |= F_DISP32;
                 hs->disp.disp32 = *(uint32_t *)p;
+            default:
+                break;
         }
         p += disp_size;
     } else if (pref & PRE_LOCK)
@@ -335,4 +344,3 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
 
     return (unsigned int)hs->len;
 }
-#pragma warning(pop)
