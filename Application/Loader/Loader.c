@@ -252,7 +252,7 @@ BdsLibConnectAllDriversToAllControllers(
 
 		//
 		// Check to see if it's possible to dispatch an more DXE drivers.
-		// The BdsLibConnectAllEfi () may have made new DXE drivers show up.
+		// The BdsLibConnectAllEfi() may have made new DXE drivers show up.
 		// If anything is Dispatched Status == EFI_SUCCESS and we will try
 		// the connect again.
 		//
@@ -397,7 +397,7 @@ TryBootOptionsInOrder(
 		//
 		// This is us
 		//
-		if (Index == CurrentBootOptionIndex)
+		if (BootOptions[Index].OptionNumber == CurrentBootOptionIndex)
 			continue;
 
 		//
@@ -538,7 +538,7 @@ TryBootOptionsInOrder(
 		gBS->SetWatchdogTimer(0x0000, 0x0000, 0x0000, NULL);
 
 		// Clear the BootCurrent variable
-		gRT->SetVariable(L"BootCurrent",
+		gRT->SetVariable(EFI_BOOT_CURRENT_VARIABLE_NAME,
 						&gEfiGlobalVariableGuid,
 						0,
 						0,
