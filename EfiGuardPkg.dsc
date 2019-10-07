@@ -87,6 +87,9 @@
   # message #2415: variable "x" of static storage duration was declared but never referenced
   INTEL:*_*_*_CC_FLAGS = /wd188,2415
 
+  # Pre-emptive strike for when this horrible option inevitably becomes the default
+  MSFT:*_*_*_CC_FLAGS = /Qspectre-
+
   # Use sane linker flags instead of EDK2 defaults
   MSFT:*_*_*_DLINK_FLAGS = /ALIGN:0x1000 /FILEALIGN:0x200 /SECTION:.pdata,!D /MERGE:.rdata=.text /DEBUG:FULL /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB%
   INTEL:*_*_*_DLINK_FLAGS = /ALIGN:0x1000 /FILEALIGN:0x200 /SECTION:.pdata,!D /MERGE:.rdata=.text /DEBUG:FULL /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB%
