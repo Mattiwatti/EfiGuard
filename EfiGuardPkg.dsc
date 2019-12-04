@@ -82,6 +82,11 @@
   *_*_*_CC_FLAGS = -D CONFIGURE_DRIVER=1
 !endif
 
+  # Source files are UTF-8 without BOM. MSVC will convert other encodings to this without asking, so this is not really a choice
+  MSFT:*_*_*_CC_FLAGS = /utf-8
+  INTEL:*_*_*_CC_FLAGS = /utf-8
+  GCC:*_*_*_CC_FLAGS = -finput-charset=UTF-8
+
   # ICC generates about a million of these for Zydis on /W4, and then quits because of /WX.
   # warning #188: enumerated type mixed with another type
   # message #2415: variable "x" of static storage duration was declared but never referenced

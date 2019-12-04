@@ -50,7 +50,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Gw %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Gw /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DisableSpecificWarnings>4201</DisableSpecificWarnings>
       <ExceptionHandling>false</ExceptionHandling>

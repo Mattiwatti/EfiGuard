@@ -480,7 +480,7 @@ TryBootOptionsInOrder(
 		// Ensure the image path is connected end-to-end by Dispatch()ing any required drivers through DXE services
 		EfiBootManagerConnectDevicePath(BootOptions[Index].FilePath, NULL);
 
-		// Instead of creating a ramdisk and reading the file into it (¿que?), just pass the path we saved earlier.
+		// Instead of creating a ramdisk and reading the file into it (Â¿que?), just pass the path we saved earlier.
 		// This is the point where the driver kicks in via its LoadImage hook.
 		EFI_HANDLE ImageHandle = NULL;
 		Status = gBS->LoadImage(TRUE,

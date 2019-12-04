@@ -42,7 +42,7 @@
       <StringPooling>true</StringPooling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <ForceConformanceInForLoopScope />
-      <AdditionalOptions>/Gs32768 /Gw %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Gs32768 /Gw /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <ErrorReporting />
       <FloatingPointModel />
       <DiagnosticsFormat>Caret</DiagnosticsFormat>

@@ -1,4 +1,4 @@
-﻿#include "EfiGuardDxe.h"
+#include "EfiGuardDxe.h"
 
 #include <Protocol/Shell.h>
 #include <Guid/EventGroup.h>
