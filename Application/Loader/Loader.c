@@ -4,6 +4,7 @@
 #include <Protocol/EfiGuard.h>
 #include <Protocol/SimpleFileSystem.h>
 #include <Protocol/LoadedImage.h>
+#include <Protocol/LegacyBios.h>
 #include <Library/UefiLib.h>
 #include <Library/DebugLib.h>
 #include <Library/MemoryAllocationLib.h>
@@ -413,6 +414,14 @@ TryBootOptionsInOrder(
 			continue;
 
 		//
+		// Ignore legacy (BBS) entries, unless non-Windows entries are allowed (second boot attempt)
+		//
+		const BOOLEAN IsLegacy = DevicePathType(BootOptions[Index].FilePath) == BBS_DEVICE_PATH &&
+			DevicePathSubType(BootOptions[Index].FilePath) == BBS_BBS_DP;
+		if (OnlyBootWindows && IsLegacy)
+			continue;
+
+		//
 		// Filter out non-Windows boot entries.
 		// Apply some heuristics based on the device path, which must end in "bootmgfw.efi" or "bootx64.efi".
 		// In the latter case we may get false positives, but for some types of boots (WinPE, Windows To Go,
@@ -442,16 +451,22 @@ TryBootOptionsInOrder(
 			MaybeWindows = TRUE;
 		}
 
-		if (ConvertedPath != NULL)
-			FreePool(ConvertedPath);
-
 		if (OnlyBootWindows && !MaybeWindows)
 		{
 			if (FullPath != BootOptions[Index].FilePath)
 				FreePool(FullPath);
-
+			if (ConvertedPath != NULL)
+				FreePool(ConvertedPath);
+			
 			// Not Windows; skip this entry
 			continue;
+		}
+
+		// Print what we're booting
+		if (ConvertedPath != NULL)
+		{
+			Print(L"Booting %Sdevice path %S...\r\n", IsLegacy ? L"legacy " : L"", ConvertedPath);
+			FreePool(ConvertedPath);
 		}
 
 		//
@@ -473,6 +488,26 @@ TryBootOptionsInOrder(
 
 		// Signal the EVT_SIGNAL_READY_TO_BOOT event
 		EfiSignalEventReadyToBoot();
+
+		// Handle BBS entries
+		if (IsLegacy)
+		{
+			Print(L"\r\nNOTE: EfiGuard does not support legacy (non-UEFI) Windows installations.\r\n"
+				L"The legacy OS will be booted, but EfiGuard will not work.\r\nPress any key to acknowledge...\r\n");
+			WaitForKey();
+
+			EFI_LEGACY_BIOS_PROTOCOL *LegacyBios;
+			Status = gBS->LocateProtocol(&gEfiLegacyBiosProtocolGuid,
+										NULL,
+										(VOID**)&LegacyBios);
+			ASSERT_EFI_ERROR(Status);
+
+			BootOptions[Index].Status = LegacyBios->LegacyBoot(LegacyBios,
+															(BBS_BBS_DEVICE_PATH*)BootOptions[Index].FilePath,
+															BootOptions[Index].OptionalDataSize,
+															BootOptions[Index].OptionalData);
+			return !EFI_ERROR(BootOptions[Index].Status);
+		}
 
 		// So again, DO NOT call this abortion:
 		//BmSetMemoryTypeInformationVariable((BOOLEAN)((BootOptions[Index].Attributes & LOAD_OPTION_CATEGORY) == LOAD_OPTION_CATEGORY_BOOT));

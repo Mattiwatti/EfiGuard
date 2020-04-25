@@ -14,6 +14,7 @@
   MdePkg/MdePkg.dec
   EfiGuardPkg/EfiGuardPkg.dec
   MdeModulePkg/MdeModulePkg.dec
+  OvmfPkg/OvmfPkg.dec
 
 [LibraryClasses]
   UefiApplicationEntryPoint
@@ -52,6 +53,7 @@
   gEfiFirmwareVolume2ProtocolGuid                  ## CONSUMES
   gEfiSimpleTextInProtocolGuid                     ## CONSUMES
   gEfiSimpleTextOutProtocolGuid                    ## CONSUMES
+  gEfiLegacyBiosProtocolGuid                       ## CONSUMES
 
 [BuildOptions.Common]
   *:DEBUG_*_*_PP_FLAGS = -D EFI_DEBUG
