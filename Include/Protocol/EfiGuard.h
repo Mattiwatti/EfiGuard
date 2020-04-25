@@ -50,7 +50,7 @@ typedef enum _EFIGUARD_DSE_BYPASS_TYPE {
 // For writes, the field that was used to supply the data will contain the original value on return.
 //
 // To perform a memcpy, set UserBuffer to a pointer-aligned buffer, Size to the size of the buffer, and IsMemCopy to TRUE.
-// There is SEH in UEFI for buffer probing, so it is the caller's responsibility that the address is valid and correctly aligned.
+// There is no SEH in UEFI for buffer probing, so it is the caller's responsibility that the address is valid and correctly aligned.
 // No backup of the original buffer will be made because this would require memory allocation at runtime. If you wish to obtain
 // the contents of the current data at KernelAddress, call the backdoor twice with the first call having IsReadOperation = TRUE.
 //
