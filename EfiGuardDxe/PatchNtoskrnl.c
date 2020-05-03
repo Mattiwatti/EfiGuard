@@ -14,7 +14,7 @@
 KERNEL_PATCH_INFORMATION gKernelPatchInfo;
 
 
-// Signature for ntoskrnl!KeInitAmd64SpecificState
+// Signature for nt!KeInitAmd64SpecificState
 // This function is present in all x64 kernels since Vista. It generates a #DE due to 32 bit idiv quotient overflow.
 STATIC CONST UINT8 SigKeInitAmd64SpecificState[] = {
 	0xF7, 0xD9,					// neg ecx
@@ -27,7 +27,18 @@ STATIC CONST UINT8 SigKeInitAmd64SpecificState[] = {
 	0x41, 0xF7, 0xF8			// idiv r8d
 };
 
-// Signature for SeCodeIntegrityQueryInformation, called through NtQuerySystemInformation(SystemCodeIntegrityInformation).
+// Signature for nt!KiSwInterrupt
+// This function is present since Windows 10 and is the interrupt handler for int 20h.
+// This interrupt is a spurious interrupt on older versions of Windows, and does nothing useful on Windows 10.
+// If int 20h is issued from kernel mode, the PatchGuard verification routine KiSwInterruptDispatch is called.
+STATIC CONST UINT8 SigKiSwInterrupt[] = {
+	0xFB,													// sti
+	0x48, 0x8D, 0xCC, 0xCC,									// lea rcx, XX
+	0xE8, 0xCC, 0xCC, 0xCC, 0xCC,							// call KiSwInterruptDispatch
+	0xFA													// cli
+};
+
+// Signature for nt!SeCodeIntegrityQueryInformation, called through NtQuerySystemInformation(SystemCodeIntegrityInformation).
 // This function has actually existed since Vista in various forms, sometimes (8/8.1/early 10) inlined in ExpQuerySystemInformation.
 // This signature is only for the Windows 10 RS3+ version. I could add more signatures but this is a pretty superficial patch anyway.
 STATIC CONST UINT8 SigSeCodeIntegrityQueryInformation[] = {
@@ -49,7 +60,7 @@ STATIC CONST UINT8 SeCodeIntegrityQueryInformationPatch[] = {
 
 //
 // Defuses PatchGuard initialization routines before execution is transferred to the kernel.
-// All code accessed here is located in the INIT section.
+// All code accessed here is located in the INIT and .text sections.
 //
 STATIC
 EFI_STATUS
@@ -58,12 +69,13 @@ DisablePatchGuard(
 	IN UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN PEFI_IMAGE_SECTION_HEADER InitSection,
+	IN PEFI_IMAGE_SECTION_HEADER TextSection,
 	IN UINT16 BuildNumber
 	)
 {
-	CONST UINT32 StartRva = InitSection->VirtualAddress;
-	CONST UINT32 SizeOfRawData = InitSection->SizeOfRawData;
-	CONST UINT8* StartVa = ImageBase + StartRva;
+	UINT32 StartRva = InitSection->VirtualAddress;
+	UINT32 SizeOfRawData = InitSection->SizeOfRawData;
+	UINT8* StartVa = ImageBase + StartRva;
 
 	// Search for KeInitAmd64SpecificState
 	PRINT_KERNEL_PATCH_MSG(L"\r\n== Searching for nt!KeInitAmd64SpecificState pattern in INIT ==\r\n");
@@ -228,6 +240,33 @@ DisablePatchGuard(
 		}
 	}
 
+	// Search for KiSwInterrupt (only exists on Windows >= 10)
+	UINT8* KiSwInterruptPatternAddress = NULL;
+	if (BuildNumber >= 10240)
+	{
+		StartRva = TextSection->VirtualAddress;
+		SizeOfRawData = TextSection->SizeOfRawData;
+		StartVa = ImageBase + StartRva;
+
+		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiSwInterrupt pattern in .text ==\r\n");
+		CONST EFI_STATUS FindKiSwInterruptStatus = FindPattern(SigKiSwInterrupt,
+																0xCC,
+																sizeof(SigKiSwInterrupt),
+																(VOID*)StartVa,
+																SizeOfRawData,
+																(VOID**)&KiSwInterruptPatternAddress);
+		if (EFI_ERROR(FindKiSwInterruptStatus))
+		{
+			// This is not a fatal error as the system can still boot without patching KiSwInterrupt.
+			// However note that in this case, any attempt to issue int 20h from kernel mode later will result in a bugcheck.
+			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiSwInterrupt. Skipping patch.\r\n");
+		}
+		else
+		{
+			PRINT_KERNEL_PATCH_MSG(L"    Found KiSwInterrupt pattern at 0x%llX.\r\n", (UINTN)KiSwInterruptPatternAddress);
+		}
+	}
+
 	// We have all the addresses we need; now do the actual patching.
 	CONST UINT32 Yes = 0xC301B0;	// mov al, 1, ret
 	CONST UINT32 No = 0xC3C033;		// xor eax, eax, ret
@@ -235,6 +274,8 @@ DisablePatchGuard(
 	*((UINT32*)CcInitializeBcbProfiler) = Yes;
 	if (ExpLicenseWatchInitWorker != NULL)
 		*((UINT32*)ExpLicenseWatchInitWorker) = No;
+	if (KiSwInterruptPatternAddress != NULL)
+		SetMem(KiSwInterruptPatternAddress, sizeof(SigKiSwInterrupt), 0x90); // 11 x nop
 
 	// Print info
 	PRINT_KERNEL_PATCH_MSG(L"\r\n    Patched KeInitAmd64SpecificState [RVA: 0x%X].\r\n",
@@ -245,6 +286,11 @@ DisablePatchGuard(
 	{
 		PRINT_KERNEL_PATCH_MSG(L"    Patched ExpLicenseWatchInitWorker [RVA: 0x%X].\r\n",
 			(UINT32)(ExpLicenseWatchInitWorker - ImageBase));
+	}
+	if (KiSwInterruptPatternAddress != NULL)
+	{
+		PRINT_KERNEL_PATCH_MSG(L"    Patched KiSwInterrupt [RVA: 0x%X].\r\n",
+			(UINT32)(KiSwInterruptPatternAddress - ImageBase));
 	}
 
 	return EFI_SUCCESS;
@@ -259,6 +305,7 @@ DisablePatchGuard(
 //
 STATIC
 EFI_STATUS
+EFIAPI
 DisableDSE(
 	IN UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
@@ -601,7 +648,7 @@ PatchNtoskrnl(
 	}
 
 	// Find the INIT and PAGE sections
-	PEFI_IMAGE_SECTION_HEADER InitSection = NULL, PageSection = NULL;
+	PEFI_IMAGE_SECTION_HEADER InitSection = NULL, TextSection = NULL, PageSection = NULL;
 	PEFI_IMAGE_SECTION_HEADER Section = IMAGE_FIRST_SECTION(NtHeaders);
 	for (UINT16 i = 0; i < NtHeaders->FileHeader.NumberOfSections; ++i)
 	{
@@ -611,6 +658,8 @@ PatchNtoskrnl(
 
 		if (AsciiStrCmp(SectionName, "INIT") == 0)
 			InitSection = Section;
+		else if (AsciiStrCmp(SectionName, ".text") == 0)
+			TextSection = Section;
 		else if (AsciiStrCmp(SectionName, "PAGE") == 0)
 			PageSection = Section;
 
@@ -618,14 +667,16 @@ PatchNtoskrnl(
 	}
 
 	ASSERT(InitSection != NULL);
+	ASSERT(TextSection != NULL);
 	ASSERT(PageSection != NULL);
 
-	// Patch INIT section to disable PatchGuard
+	// Patch INIT and .text sections to disable PatchGuard
 	PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] Disabling PatchGuard... [INIT RVA: 0x%X - 0x%X]\r\n",
 		InitSection->VirtualAddress, InitSection->VirtualAddress + InitSection->SizeOfRawData);
 	Status = DisablePatchGuard((UINT8*)ImageBase,
 								NtHeaders,
 								InitSection,
+								TextSection,
 								BuildNumber);
 	if (EFI_ERROR(Status))
 		return Status;
