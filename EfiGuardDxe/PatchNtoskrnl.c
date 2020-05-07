@@ -27,6 +27,14 @@ STATIC CONST UINT8 SigKeInitAmd64SpecificState[] = {
 	0x41, 0xF7, 0xF8			// idiv r8d
 };
 
+// Signature for nt!KiVerifyScopesExecute
+// This function is present since Windows 8.1 and is responsible for executing all functions in the KiVerifyXcptRoutines array.
+// One of these functions, KiVerifyXcpt15, will indirectly initialize a PatchGuard context from its exception handler.
+STATIC CONST UINT8 SigKiVerifyScopesExecute[] = {
+	0x48, 0x83, 0xCC, 0xCC, 0x00,								// and [REG+XX], 0
+	0x48, 0xB8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE	// mov rax, 0FEFFFFFFFFFFFFFFh
+};
+
 // Signature for nt!KiSwInterrupt
 // This function is present since Windows 10 and is the interrupt handler for int 20h.
 // This interrupt is a spurious interrupt on older versions of Windows, and does nothing useful on Windows 10.
@@ -240,6 +248,35 @@ DisablePatchGuard(
 		}
 	}
 
+	// Search for KiVerifyScopesExecute (only exists on Windows >= 8.1)
+	UINT8* KiVerifyScopesExecute = NULL;
+	if (BuildNumber >= 9600)
+	{
+		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiVerifyScopesExecute pattern in INIT ==\r\n");
+		UINT8* KiVerifyScopesExecutePatternAddress = NULL;
+		CONST EFI_STATUS FindKiVerifyScopesExecuteStatus = FindPattern(SigKiVerifyScopesExecute,
+																	0xCC,
+																	sizeof(SigKiVerifyScopesExecute),
+																	(VOID*)StartVa,
+																	SizeOfRawData,
+																	(VOID**)&KiVerifyScopesExecutePatternAddress);
+		if (EFI_ERROR(FindKiVerifyScopesExecuteStatus))
+		{
+			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiVerifyScopesExecute pattern.\r\n");
+			return EFI_NOT_FOUND;
+		}
+		PRINT_KERNEL_PATCH_MSG(L"    Found KiVerifyScopesExecute pattern at 0x%llX.\r\n", (UINTN)KiVerifyScopesExecutePatternAddress);
+
+		// Backtrack to function start
+		KiVerifyScopesExecute = BacktrackToFunctionStart(KiVerifyScopesExecutePatternAddress,
+			(UINT8*)(KiVerifyScopesExecutePatternAddress - StartVa));
+		if (KiVerifyScopesExecute == NULL)
+		{
+			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiVerifyScopesExecute.\r\n");
+			return EFI_NOT_FOUND;
+		}
+	}
+
 	// Search for KiSwInterrupt (only exists on Windows >= 10)
 	UINT8* KiSwInterruptPatternAddress = NULL;
 	if (BuildNumber >= 10240)
@@ -274,6 +311,8 @@ DisablePatchGuard(
 	*((UINT32*)CcInitializeBcbProfiler) = Yes;
 	if (ExpLicenseWatchInitWorker != NULL)
 		*((UINT32*)ExpLicenseWatchInitWorker) = No;
+	if (KiVerifyScopesExecute != NULL)
+		*(UINT32*)KiVerifyScopesExecute = No;
 	if (KiSwInterruptPatternAddress != NULL)
 		SetMem(KiSwInterruptPatternAddress, sizeof(SigKiSwInterrupt), 0x90); // 11 x nop
 
@@ -286,6 +325,11 @@ DisablePatchGuard(
 	{
 		PRINT_KERNEL_PATCH_MSG(L"    Patched ExpLicenseWatchInitWorker [RVA: 0x%X].\r\n",
 			(UINT32)(ExpLicenseWatchInitWorker - ImageBase));
+	}
+	if (KiVerifyScopesExecute != NULL)
+	{
+		PRINT_KERNEL_PATCH_MSG(L"    Patched KiVerifyScopesExecute [RVA: 0x%X].\r\n",
+			(UINT32)(KiVerifyScopesExecute - ImageBase));
 	}
 	if (KiSwInterruptPatternAddress != NULL)
 	{
