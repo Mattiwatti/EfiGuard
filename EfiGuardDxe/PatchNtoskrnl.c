@@ -35,6 +35,17 @@ STATIC CONST UINT8 SigKiVerifyScopesExecute[] = {
 	0x48, 0xB8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE	// mov rax, 0FEFFFFFFFFFFFFFFh
 };
 
+// Signature for nt!KiMcaDeferredRecoveryService
+// This function is present since Windows 8.1 and bugchecks the system with bugcode 0x109 after zeroing registers.
+// It is called by KiScanQueues and KiSchedulerDpc, two PatchGuard DPCs which may be queued from various unrelated kernel functions.
+STATIC CONST UINT8 SigKiMcaDeferredRecoveryService[] = {
+	0x33, 0xC0,												// xor eax, eax
+	0x8B, 0xD8,												// mov ebx, eax
+	0x8B, 0xF8,												// mov edi, eax
+	0x8B, 0xE8,												// mov ebp, eax
+	0x4C, 0x8B, 0xD0										// mov r10, rax
+};
+
 // Signature for nt!KiSwInterrupt
 // This function is present since Windows 10 and is the interrupt handler for int 20h.
 // This interrupt is a spurious interrupt on older versions of Windows, and does nothing useful on Windows 10.
@@ -136,7 +147,7 @@ DisablePatchGuard(
 		return EFI_LOAD_ERROR;
 	}
 
-	CONST UINTN Length = SizeOfRawData;
+	UINTN Length = SizeOfRawData;
 	UINTN Offset = 0;
 	ZyanU64 InstructionAddress;
 	ZydisDecodedInstruction Instruction;
@@ -277,14 +288,85 @@ DisablePatchGuard(
 		}
 	}
 
-	// Search for KiSwInterrupt (only exists on Windows >= 10)
-	UINT8* KiSwInterruptPatternAddress = NULL;
-	if (BuildNumber >= 10240)
+	// Search for callers of KiMcaDeferredRecoveryService (only exists on Windows >= 8.1)
+	UINT8* KiMcaDeferredRecoveryServiceCallers[2];
+	ZeroMem(KiMcaDeferredRecoveryServiceCallers, sizeof(KiMcaDeferredRecoveryServiceCallers));
+	if (BuildNumber >= 9600)
 	{
 		StartRva = TextSection->VirtualAddress;
 		SizeOfRawData = TextSection->SizeOfRawData;
 		StartVa = ImageBase + StartRva;
 
+		// Search for KiMcaDeferredRecoveryService
+		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiMcaDeferredRecoveryService pattern in .text ==\r\n");
+		UINT8* KiMcaDeferredRecoveryService = NULL;
+		for (UINT8* Address = (UINT8*)StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKiMcaDeferredRecoveryService); ++Address)
+		{
+			if (CompareMem(Address, SigKiMcaDeferredRecoveryService, sizeof(SigKiMcaDeferredRecoveryService)) == 0)
+			{
+				KiMcaDeferredRecoveryService = Address;
+				PRINT_KERNEL_PATCH_MSG(L"    Found KiMcaDeferredRecoveryService pattern at 0x%llX.\r\n", (UINTN)KiMcaDeferredRecoveryService);
+				break;
+			}
+		}
+
+		if (KiMcaDeferredRecoveryService == NULL)
+		{
+			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiMcaDeferredRecoveryService.\r\n");
+			return EFI_NOT_FOUND;
+		}
+
+		// Start decode loop
+		Length = SizeOfRawData;
+		Offset = 0;
+		while ((InstructionAddress = (ZyanU64)(StartVa + Offset),
+				Status = ZydisDecoderDecodeBuffer(&Decoder,
+												(VOID*)InstructionAddress,
+												Length - Offset,
+												&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+		{
+			if (!ZYAN_SUCCESS(Status))
+			{
+				Offset++;
+				continue;
+			}
+
+			// Check if this is 'call KiMcaDeferredRecoveryService'
+			ZyanU64 OperandAddress = 0;	
+			if (Instruction.mnemonic == ZYDIS_MNEMONIC_CALL &&
+				ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+				OperandAddress == (UINTN)KiMcaDeferredRecoveryService)
+			{
+				if (KiMcaDeferredRecoveryServiceCallers[0] == NULL)
+				{
+					KiMcaDeferredRecoveryServiceCallers[0] = (UINT8*)InstructionAddress;
+				}
+				else if (KiMcaDeferredRecoveryServiceCallers[1] == NULL)
+				{
+					KiMcaDeferredRecoveryServiceCallers[1] = (UINT8*)InstructionAddress;
+					break;
+				}
+			}
+
+			Offset += Instruction.length;
+		}
+
+		// Backtrack to function start
+		KiMcaDeferredRecoveryServiceCallers[0] = BacktrackToFunctionStart(KiMcaDeferredRecoveryServiceCallers[0],
+			(UINT8*)(KiMcaDeferredRecoveryServiceCallers[0] - StartVa));
+		KiMcaDeferredRecoveryServiceCallers[1] = BacktrackToFunctionStart(KiMcaDeferredRecoveryServiceCallers[1],
+			(UINT8*)(KiMcaDeferredRecoveryServiceCallers[1] - StartVa));
+		if (KiMcaDeferredRecoveryServiceCallers[0] == NULL || KiMcaDeferredRecoveryServiceCallers[1] == NULL)
+		{
+			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiMcaDeferredRecoveryService callers.\r\n");
+			return EFI_NOT_FOUND;
+		}
+	}
+
+	// Search for KiSwInterrupt (only exists on Windows >= 10)
+	UINT8* KiSwInterruptPatternAddress = NULL;
+	if (BuildNumber >= 10240)
+	{
 		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiSwInterrupt pattern in .text ==\r\n");
 		CONST EFI_STATUS FindKiSwInterruptStatus = FindPattern(SigKiSwInterrupt,
 																0xCC,
@@ -313,6 +395,11 @@ DisablePatchGuard(
 		*((UINT32*)ExpLicenseWatchInitWorker) = No;
 	if (KiVerifyScopesExecute != NULL)
 		*(UINT32*)KiVerifyScopesExecute = No;
+	if (KiMcaDeferredRecoveryServiceCallers[0] != NULL && KiMcaDeferredRecoveryServiceCallers[1] != NULL)
+	{
+		*(UINT32*)KiMcaDeferredRecoveryServiceCallers[0] = No;
+		*(UINT32*)KiMcaDeferredRecoveryServiceCallers[1] = No;
+	}
 	if (KiSwInterruptPatternAddress != NULL)
 		SetMem(KiSwInterruptPatternAddress, sizeof(SigKiSwInterrupt), 0x90); // 11 x nop
 
@@ -330,6 +417,12 @@ DisablePatchGuard(
 	{
 		PRINT_KERNEL_PATCH_MSG(L"    Patched KiVerifyScopesExecute [RVA: 0x%X].\r\n",
 			(UINT32)(KiVerifyScopesExecute - ImageBase));
+	}
+	if (KiMcaDeferredRecoveryServiceCallers[0] != NULL && KiMcaDeferredRecoveryServiceCallers[1] != NULL)
+	{
+		PRINT_KERNEL_PATCH_MSG(L"    Patched KiMcaDeferredRecoveryService [RVAs: 0x%X, 0x%X].\r\n",
+			(UINT32)(KiMcaDeferredRecoveryServiceCallers[0] - ImageBase),
+			(UINT32)(KiMcaDeferredRecoveryServiceCallers[1] - ImageBase));
 	}
 	if (KiSwInterruptPatternAddress != NULL)
 	{
