@@ -36,6 +36,14 @@ STATIC CHAR16* mDriverPaths[] = {
 };
 
 
+extern
+EFI_STATUS
+EFIAPI
+BmSetMemoryTypeInformationVariable(
+	IN BOOLEAN Boot
+	);
+
+
 STATIC
 BOOLEAN
 EFIAPI
@@ -511,6 +519,10 @@ TryBootOptionsInOrder(
 
 		// So again, DO NOT call this abortion:
 		//BmSetMemoryTypeInformationVariable((BOOLEAN)((BootOptions[Index].Attributes & LOAD_OPTION_CATEGORY) == LOAD_OPTION_CATEGORY_BOOT));
+		//
+		// OK, maybe call it after all, but pretend this is *not* a boot entry, so that the system will not go into an infinite boot (reset) loop.
+		// This may or may not fix hibernation related issues (S4 entry/resume). See https://github.com/Mattiwatti/EfiGuard/issues/12
+		BmSetMemoryTypeInformationVariable(FALSE);
 
 		// Ensure the image path is connected end-to-end by Dispatch()ing any required drivers through DXE services
 		EfiBootManagerConnectDevicePath(BootOptions[Index].FilePath, NULL);
