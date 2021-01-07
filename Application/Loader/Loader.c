@@ -37,7 +37,7 @@ STATIC CHAR16* mDriverPaths[] = {
 
 
 extern
-EFI_STATUS
+VOID
 EFIAPI
 BmSetMemoryTypeInformationVariable(
 	IN BOOLEAN Boot

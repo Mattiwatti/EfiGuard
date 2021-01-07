@@ -252,6 +252,8 @@ NTSTATUS
 TestSetVariableHook(
 	)
 {
+	UINT16 Mz;
+
 	// Enable privileges in case we were called directly from the CLI with --check
 	BOOLEAN SeSystemEnvironmentWasEnabled;
 	NTSTATUS Status = SetSystemEnvironmentPrivilege(TRUE, &SeSystemEnvironmentWasEnabled);
@@ -306,7 +308,7 @@ TestSetVariableHook(
 	}
 
 	// Check if hal.dll still starts with "MZ"
-	UINT16 Mz = static_cast<UINT16>(BackdoorData.u.s.Word);
+	Mz = static_cast<UINT16>(BackdoorData.u.s.Word);
 	if (Mz != 0x5A4D)
 	{
 		Printf(L"Failure: received unexpected data from test read of 0x%p. Expected: 4D 5A, received: %02X %02X.\n",
