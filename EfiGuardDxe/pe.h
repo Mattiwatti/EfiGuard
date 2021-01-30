@@ -40,6 +40,8 @@ typedef EFI_IMAGE_EXPORT_DIRECTORY *PEFI_IMAGE_EXPORT_DIRECTORY;
 #define VS_VERSION_INFO									1
 #define VS_FF_DEBUG										(0x00000001L)
 
+#define RUNTIME_FUNCTION_INDIRECT						0x1
+
 #define IMAGE32(NtHeaders) ((NtHeaders)->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC)
 #define IMAGE64(NtHeaders) ((NtHeaders)->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC)
 
@@ -170,6 +172,21 @@ typedef struct _VS_VERSIONINFO
 	VS_FIXEDFILEINFO FixedFileInfo;
 	// Omitted: padding fields that do not contribute to TotalSize
 } VS_VERSIONINFO, *PVS_VERSIONINFO;
+
+
+//
+// Function table entry data
+//
+typedef struct _RUNTIME_FUNCTION
+{
+	UINT32 BeginAddress;
+	UINT32 EndAddress;
+	union
+	{
+		UINT32 UnwindInfoAddress;
+		UINT32 UnwindData;
+	} u;
+} RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
 
 
 //

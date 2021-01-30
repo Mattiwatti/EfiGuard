@@ -42,6 +42,7 @@ AppendKernelPatchMessage(
 VOID
 EFIAPI
 PrintKernelPatchInfo(
+	VOID
 	);
 
 //
@@ -51,6 +52,7 @@ PrintKernelPatchInfo(
 BOOLEAN
 EFIAPI
 WaitForKey(
+	VOID
 	);
 
 //
@@ -108,13 +110,13 @@ ZydisInit(
 	);
 
 //
-// Finds the start of a function given an address within it, scanning downwards.
-// Returns NULL if StartAddress is NULL (this simplifies error checking logic in calling functions).
-// Returns NULL if LowerBound is reached and no function boundary was found.
+// Finds the start of a function given an address within it.
+// Returns NULL if AddressInFunction is NULL (this simplifies error checking logic in calling functions).
 //
 UINT8*
 EFIAPI
 BacktrackToFunctionStart(
-	IN CONST UINT8* StartAddress,
-	IN CONST UINT8* LowerBound
+	IN CONST UINT8* ImageBase,
+	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
+	IN CONST UINT8* AddressInFunction
 	);

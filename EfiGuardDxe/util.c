@@ -78,6 +78,7 @@ AppendKernelPatchMessage(
 VOID
 EFIAPI
 PrintKernelPatchInfo(
+	VOID
 	)
 {
 	ASSERT(gST->ConOut != NULL);
@@ -101,6 +102,7 @@ PrintKernelPatchInfo(
 BOOLEAN
 EFIAPI
 WaitForKey(
+	VOID
 	)
 {
 	// Hack: because we call this at TPL_NOTIFY in ExitBootServices, we cannot use WaitForEvent()
@@ -339,42 +341,51 @@ ZydisInit(
 UINT8*
 EFIAPI
 BacktrackToFunctionStart(
-	IN CONST UINT8* StartAddress,
-	IN CONST UINT8* LowerBound
+	IN CONST UINT8* ImageBase,
+	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
+	IN CONST UINT8* AddressInFunction
 	)
 {
 	// Test for null. This allows callers to do 'FindPattern(..., &Address); X = Backtrack(Address, ...)' with a single failure branch
-	if (StartAddress == NULL)
+	if (AddressInFunction == NULL)
+		return NULL;
+	if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION)
 		return NULL;
 
-	ASSERT(StartAddress > LowerBound);
+	CONST PRUNTIME_FUNCTION FunctionTable = (PRUNTIME_FUNCTION)(ImageBase + NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress);
+	CONST UINT32 FunctionTableSize = NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size;
+	if (FunctionTableSize == 0)
+		return NULL;
 
-	UINT8 *Address;
-	BOOLEAN Found = FALSE;
-	for (Address = (UINT8*)StartAddress; Address >= LowerBound; --Address)
+	// Do a binary search until we find the function that contains our address
+	CONST UINT32 RelativeAddress = (UINT32)(AddressInFunction - ImageBase);
+	PRUNTIME_FUNCTION FunctionEntry = NULL;
+	INT32 Low = 0;
+	INT32 High = (FunctionTableSize / sizeof(RUNTIME_FUNCTION)) - 1;
+	
+	while (High >= Low)
 	{
-		if ((*(Address - 1) == 0xCC ||										// Previous byte is int 3 padding, or
-			(*(Address - 2) == 0x90 && *(Address - 1) == 0x90) ||			// Previous 2 bytes are nop padding, or
-			(*(Address - 4) == 0x00 && *(Address - 3) == 0x00 &&			// Previous 4+ bytes are 00 padding (rare, only happens at start of a section), or
-				*(Address - 2) == 0x00 && *(Address - 1) == 0x00) ||
-			(*(Address - 1) == 0xC3 && *(Address - 3) != 0x8D)				// Previous byte is 'ret', or
-#if defined(MDE_CPU_IA32) || defined(_M_IX86)
-			|| (*(Address - 3) == 0xC2 && *(Address - 1) == 0x00)			// Previous 3 bytes are 'ret XX' (x86)
-#endif
-			)
-			&&																// *and*
-			(*Address == 0x40 || *Address == 0x55 ||						// Current byte is either 'push [ebp|ebx|rbp|rbx]', 'mov REG, XX' or 'sub REG, XX'
-			(Address < StartAddress && *Address == 0x44 && *(Address + 1) == 0x89) ||
-			(Address < StartAddress && *Address == 0x48 && *(Address + 1) == 0x83) ||
-			(Address < StartAddress && *Address == 0x48 && *(Address + 1) == 0x89) ||
-			(Address < StartAddress && *Address == 0x48 && *(Address + 1) == 0x8B) ||
-			(Address < StartAddress && *Address == 0x49 && *(Address + 1) == 0x89) ||
-			(Address < StartAddress && *Address == 0x4C && *(Address + 1) == 0x8B)))
-		{
-			Found = TRUE;
+		CONST INT32 Middle = (Low + High) >> 1;
+		FunctionEntry = &FunctionTable[Middle];
+
+		if (RelativeAddress < FunctionEntry->BeginAddress)
+			High = Middle - 1;
+		else if (RelativeAddress >= FunctionEntry->EndAddress)
+			Low = Middle + 1;
+		else
 			break;
-		}
 	}
 
-	return Found ? Address : NULL;
+	if (High >= Low)
+	{
+		// If the function entry specifies indirection, get the address of the master function entry
+		if ((FunctionEntry->u.UnwindData & RUNTIME_FUNCTION_INDIRECT) != 0)
+		{
+			FunctionEntry = (PRUNTIME_FUNCTION)(FunctionEntry->u.UnwindData + ImageBase - 1);
+		}
+		
+		return (UINT8*)ImageBase + FunctionEntry->BeginAddress;
+	}
+
+	return NULL;
 }

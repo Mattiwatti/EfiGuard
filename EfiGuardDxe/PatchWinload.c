@@ -191,7 +191,7 @@ PatchImgpValidateImageHash(
 	}
 
 	// Backtrack to function start
-	CONST UINT8* ImgpValidateImageHash = BacktrackToFunctionStart(AndMinusFortyOneAddress, CodeStartVa);
+	CONST UINT8* ImgpValidateImageHash = BacktrackToFunctionStart(ImageBase, NtHeaders, AndMinusFortyOneAddress);
 	if (ImgpValidateImageHash == NULL)
 	{
 		Print(L"    Failed to find %S!ImgpValidateImageHash%S.\r\n",
@@ -329,7 +329,7 @@ PatchImgpFilterValidationFailure(
 	}
 
 	// Backtrack to function start
-	CONST UINT8* ImgpFilterValidationFailure = BacktrackToFunctionStart(LeaIntegrityFailureAddress, LeaIntegrityFailureAddress - Length);
+	CONST UINT8* ImgpFilterValidationFailure = BacktrackToFunctionStart(ImageBase, NtHeaders, LeaIntegrityFailureAddress);
 	if (ImgpFilterValidationFailure == NULL)
 	{
 		Print(L"    Failed to find %S!ImgpFilterValidationFailure%S.\r\n",
@@ -380,7 +380,7 @@ FindOslFwpKernelSetupPhase1(
 		if (!EFI_ERROR(Status))
 		{
 			// Found signature; backtrack to function start
-			*OslFwpKernelSetupPhase1Address = BacktrackToFunctionStart(Found, Found - 0x400);
+			*OslFwpKernelSetupPhase1Address = BacktrackToFunctionStart(ImageBase, NtHeaders, Found);
 			if (*OslFwpKernelSetupPhase1Address != NULL)
 			{
 				Print(L"\r\nFound OslFwpKernelSetupPhase1 at 0x%llX.\r\n", (UINTN)(*OslFwpKernelSetupPhase1Address));
@@ -479,7 +479,7 @@ FindOslFwpKernelSetupPhase1(
 		return EFI_NOT_FOUND;
 	}
 
-	CONST UINT8* EfipGetRsdt = BacktrackToFunctionStart(LeaEfiAcpiTableGuidAddress, LeaEfiAcpiTableGuidAddress - Length);
+	CONST UINT8* EfipGetRsdt = BacktrackToFunctionStart(ImageBase, NtHeaders, LeaEfiAcpiTableGuidAddress);
 	if (EfipGetRsdt == NULL)
 	{
 		Print(L"    Failed to find EfipGetRsdt.\r\n");
@@ -516,7 +516,7 @@ FindOslFwpKernelSetupPhase1(
 				OperandAddress == (UINTN)EfipGetRsdt)
 			{
 				// Calculate the distance from the start of the function to the instruction. OslFwpKernelSetupPhase1 will always have the shortest distance
-				CONST UINTN StartOfFunction = (UINTN)BacktrackToFunctionStart((UINT8*)InstructionAddress, (UINT8*)InstructionAddress - Length);
+				CONST UINTN StartOfFunction = (UINTN)BacktrackToFunctionStart(ImageBase, NtHeaders, (UINT8*)InstructionAddress);
 				CONST UINTN Distance = InstructionAddress - StartOfFunction;
 				if (Distance < ShortestDistanceToCall)
 				{

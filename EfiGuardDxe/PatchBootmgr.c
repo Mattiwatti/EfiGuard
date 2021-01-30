@@ -300,7 +300,7 @@ PatchBootManager(
 	// Found signature; backtrack to function start
 	// Note: pOriginalAddress is a pointer to a (function) pointer, because the original address depends on the type of boot manager we are patching.
 	VOID **pOriginalAddress = PatchingBootmgrEfi ? &gOriginalBootmgrImgArchStartBootApplication : &gOriginalBootmgfwImgArchStartBootApplication;
-	*pOriginalAddress = (VOID*)BacktrackToFunctionStart(Found, MAX((UINT8*)ImageBase + CodeSection->VirtualAddress, Found - 1024));
+	*pOriginalAddress = (VOID*)BacktrackToFunctionStart((UINT8*)ImageBase, NtHeaders, Found);
 	CONST VOID* OriginalAddress = *pOriginalAddress;
 	if (OriginalAddress == NULL)
 	{
