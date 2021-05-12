@@ -85,7 +85,7 @@ QueryCiOptions(
 	LONG Relative = 0;
 	hde64s hs;
 
-	const PUCHAR CiInitialize = reinterpret_cast<PUCHAR>(GetProcedureAddress(reinterpret_cast<ULONG_PTR>(MappedBase), "CiInitialize"));
+	const PUCHAR CiInitialize = static_cast<PUCHAR>(GetProcedureAddress(reinterpret_cast<ULONG_PTR>(MappedBase), "CiInitialize"));
 	if (CiInitialize == nullptr)
 		return 0;
 
@@ -96,13 +96,19 @@ QueryCiOptions(
 		do
 		{
 			// call CipInitialize
-			if (CiInitialize[i] == 0xE8)
+			const BOOLEAN IsCall = CiInitialize[i] == 0xE8;
+			if (IsCall)
 				j++;
 
-			if (j > 1)
+			if (IsCall && j > 1)
 			{
 				Relative = *reinterpret_cast<PLONG>(CiInitialize + i + 1);
-				break;
+
+				// KB5003173 added a new 'call wil_InitializeFeatureStaging' to CiInitialize that we need to skip
+				const PUCHAR CallTarget = CiInitialize + i + 5 + Relative;
+				hde64_disasm(CallTarget, &hs);
+				if ((hs.flags & F_ERROR) == 0 && hs.len >= 4 && hs.len <= 6) // wil_InitializeFeatureStaging: 3, __security_init_cookie: 7, CipInitialize: 5
+					break;
 			}
 
 			hde64_disasm(CiInitialize + i, &hs);
