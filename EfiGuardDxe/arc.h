@@ -205,52 +205,80 @@ typedef struct _CONFIGURATION_COMPONENT_DATA {
 // Define memory allocation structures used in all systems.
 //
 typedef enum _TYPE_OF_MEMORY {
-	LoaderExceptionBlock,								// 0
-	LoaderSystemBlock,									// 1
-	LoaderFree,											// 2
-	LoaderBad,											// 3
-	LoaderLoadedProgram,								// 4
-	LoaderFirmwareTemporary,							// 5
-	LoaderFirmwarePermanent,							// 6
-	LoaderOsloaderHeap,									// 7
-	LoaderOsloaderStack,								// 8
-	LoaderSystemCode,									// 9
-	LoaderHalCode,										// a
-	LoaderBootDriver,									// b
-	LoaderConsoleInDriver,								// c
-	LoaderConsoleOutDriver,								// d
-	LoaderStartupDpcStack,								// e
-	LoaderStartupKernelStack,							// f
-	LoaderStartupPanicStack,							// 10
-	LoaderStartupPcrPage,								// 11
-	LoaderStartupPdrPage,								// 12
-	LoaderRegistryData,									// 13
-	LoaderMemoryData,									// 14
-	LoaderNlsData,										// 15
-	LoaderSpecialMemory,								// 16
-	LoaderBBTMemory,									// 17
-	LoaderZero,											// 18
-	LoaderXIPRom,										// 19
-	LoaderHALCachedMemory,								// 1a
-	LoaderLargePageFiller,								// 1b
-	LoaderErrorLogMemory,								// 1c
-	LoaderVsmMemory,									// 1d
-	LoaderFirmwareCode,									// 1e
-	LoaderFirmwareData,									// 1f
-	LoaderFirmwareReserved,								// 20
-	LoaderEnclaveMemory,								// 21
-	LoaderFirmwareKsr,									// 22
-	LoaderEnclaveKsr,									// 23
-	LoaderSkMemory,										// 24
-	LoaderSkFirmwareReserved,							// 25
-	LoaderIoSpaceMemoryZeroed,							// 26
-	LoaderIoSpaceMemoryFree,							// 27
-	LoaderIoSpaceMemoryKsr,								// 28
-	LoaderMaximum,										// 29
-} TYPE_OF_MEMORY;
+	LoaderExceptionBlock,
+	LoaderSystemBlock,
+	LoaderFree,
+	LoaderBad,
+	LoaderLoadedProgram,
+	LoaderFirmwareTemporary,
+	LoaderFirmwarePermanent,
+	LoaderOsloaderHeap,
+	LoaderOsloaderStack,
+	LoaderSystemCode,
+	LoaderHalCode,
+	LoaderBootDriver,
+	LoaderConsoleInDriver,
+	LoaderConsoleOutDriver,
+	LoaderStartupDpcStack,
+	LoaderStartupKernelStack,
+	LoaderStartupPanicStack,
+	LoaderStartupPcrPage,
+	LoaderStartupPdrPage,
+	LoaderRegistryData,
+	LoaderMemoryData,
+	LoaderNlsData,
+	LoaderSpecialMemory,
+	LoaderBBTMemory,
+	LoaderZero,
+	LoaderXIPRom,
+	LoaderHALCachedMemory,
+	LoaderLargePageFiller,
+	LoaderErrorLogMemory,
+	LoaderVsmMemory,
+	LoaderFirmwareCode,
+	LoaderFirmwareData,
+	LoaderFirmwareReserved,
+	LoaderEnclaveMemory,
+	LoaderFirmwareKsr,
+	LoaderEnclaveKsr,
+	LoaderSkMemory,
+	LoaderSkFirmwareReserved,
+	LoaderIoSpaceMemoryZeroed,
+	LoaderIoSpaceMemoryFree,
+	LoaderIoSpaceMemoryKsr,
+	LoaderKernelShadowStack,
+	LoaderIsolatedHostVisible,
+	LoaderMaximum
+} TYPE_OF_MEMORY, *PTYPE_OF_MEMORY;
+
+typedef struct _RTL_BALANCED_NODE {
+	union {
+		struct _RTL_BALANCED_NODE *Children[2];
+		struct {
+			struct _RTL_BALANCED_NODE *Left;
+			struct _RTL_BALANCED_NODE *Right;
+		} s;
+	} u1;
+	union {
+		UINT8 Red : 1;
+		UINT8 Balance : 2;
+		UINTN ParentValue;
+	} u2;
+} RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
+
+typedef struct _RTL_RB_TREE {
+	PRTL_BALANCED_NODE Root;
+	union {
+		UINT8 Encoded : 1;
+		PRTL_BALANCED_NODE Min;
+	} u;
+} RTL_RB_TREE, *PRTL_RB_TREE;
 
 typedef struct _MEMORY_ALLOCATION_DESCRIPTOR {
-	LIST_ENTRY ListEntry;
+	union {
+		LIST_ENTRY ListEntry;
+		RTL_BALANCED_NODE Node;
+	} u;
 	TYPE_OF_MEMORY MemoryType;
 	UINTN BasePage;
 	UINTN PageCount;
@@ -267,7 +295,7 @@ typedef struct _NLS_DATA_BLOCK {
 
 typedef struct _VHD_DISK_SIGNATURE {
 	UINT32 ParentPartitionNumber;
-	UINT8 BootDevice[ANYSIZE_ARRAY];
+	CHAR8 BootDevice[ANYSIZE_ARRAY];
 } VHD_DISK_SIGNATURE, *PVHD_DISK_SIGNATURE;
 
 typedef struct _ARC_DISK_SIGNATURE {
@@ -279,7 +307,7 @@ typedef struct _ARC_DISK_SIGNATURE {
 	BOOLEAN xInt13;
 	BOOLEAN IsGpt;
 	UINT8 Reserved;
-	UINT8 GptSignature[16];
+	CHAR8 GptSignature[16];
 	PVHD_DISK_SIGNATURE VhdSignature;
 } ARC_DISK_SIGNATURE, *PARC_DISK_SIGNATURE;
 
@@ -476,14 +504,14 @@ typedef struct _LOADER_PARAMETER_HYPERVISOR_EXTENSION {
 //
 // Code Integrity specific loader parameters.
 //
-typedef struct _LOADER_PARAMETER_CI_EXTENSION
-{
+typedef struct _LOADER_PARAMETER_CI_EXTENSION {
 	UINT32 CodeIntegrityOptions;
 	struct {
 		UINT32 UpgradeInProgress : 1;
 		UINT32 IsWinPE : 1;
 		UINT32 CustomKernelSignersAllowed : 1;
-		UINT32 Reserved : 29;
+		UINT32 StateSeparationEnabled : 1;
+		UINT32 Reserved : 28;
 	} s;
 	LARGE_INTEGER WhqlEnforcementDate;
 	UINT32 RevocationListOffset;
@@ -502,6 +530,36 @@ typedef struct _LOADER_PARAMETER_CI_EXTENSION
 	UINT32 Reserved2;
 	UINT8 SerializedData[ANYSIZE_ARRAY]; // RevocationListSize bytes
 } LOADER_PARAMETER_CI_EXTENSION, *PLOADER_PARAMETER_CI_EXTENSION;
+
+typedef struct _NUMA_MEMORY_RANGE {
+	UINT32 ProximityId;
+	UINT64 BasePage;
+	UINT64 EndPage;
+} NUMA_MEMORY_RANGE, *PNUMA_MEMORY_RANGE;
+
+typedef struct _BOOT_FIRMWARE_RAMDISK_INFO {
+	UINT32 Version;
+	UINT32 BlockSize;
+	UINT64 BaseAddress;
+	UINT64 Size;
+} BOOT_FIRMWARE_RAMDISK_INFO, *PBOOT_FIRMWARE_RAMDISK_INFO;
+
+typedef struct _LOADER_MEMORY_RANGE {
+	UINT64 StartPage;
+	UINT64 NumberOfPages;
+} LOADER_MEMORY_RANGE, *PLOADER_MEMORY_RANGE;
+
+typedef struct _MEMORY_MIRRORING_DATA {
+	UINT32 MemoryRangeCount;
+	UINT32 IoSpaceRangeCount;
+	PLOADER_MEMORY_RANGE MemoryRanges;
+	PLOADER_MEMORY_RANGE IoSpaceRanges;
+} MEMORY_MIRRORING_DATA, *PMEMORY_MIRRORING_DATA;
+
+typedef struct _INSTALLED_MEMORY_RANGE {
+	UINT64 BasePage;
+	UINT64 PageCount;
+} INSTALLED_MEMORY_RANGE, *PINSTALLED_MEMORY_RANGE;
 
 typedef struct _HAL_EXTENSION_INSTANCE_ENTRY {
 
@@ -561,7 +619,7 @@ typedef struct _LOADER_BUGCHECK_PARAMETERS {
 // Since 10.0.14393.0
 //
 typedef struct _LEAP_SECOND_DATA {
-	UINT8 Enabled;
+	BOOLEAN Enabled;
 	UINT32 Count;
 	LARGE_INTEGER Data[1];
 } LEAP_SECOND_DATA, *PLEAP_SECOND_DATA;
@@ -589,6 +647,48 @@ typedef struct _LOADER_RESET_REASON {
 typedef struct _VSM_PERFORMANCE_DATA {
 	UINT64 LaunchVsmMark[8];
 } VSM_PERFORMANCE_DATA, *PVSM_PERFORMANCE_DATA;
+
+//
+// Since ~10.0.20150.0
+//
+typedef struct _LOADER_FEATURE_CONFIGURATION_DIAGNOSTIC_INFORMATION {
+	UINT8 OriginalBootStatus;
+	UINT8 NewBootStatus;
+	UINT8 ConfigurationLoaded;
+	UINT8 Spare;
+	union {
+		union {
+			UINT32 AllFlags;
+			UINT32 LkgSupported : 1;
+			UINT32 FinalBootBeforeRecovery : 1;
+			UINT32 ConfigurationComparisonAttempted : 1;
+			UINT32 CurrentConfigurationLoadAttempted : 1;
+			UINT32 LkgConfigurationLoadAttempted : 1;
+			UINT32 UsageSubscriptionLoadAttempted : 1;
+			UINT32 Spare : 26;
+		} u;
+	} Flags;
+	INT32 ConfigurationComparisonStatus;
+	INT32 CurrentConfigurationLoadStatus;
+	INT32 LkgConfigurationLoadStatus;
+	INT32 UsageSubscriptionLoadStatus;
+} LOADER_FEATURE_CONFIGURATION_DIAGNOSTIC_INFORMATION, *PLOADER_FEATURE_CONFIGURATION_DIAGNOSTIC_INFORMATION;
+
+typedef struct _LOADER_FEATURE_CONFIGURATION_INFORMATION {
+	VOID* FeatureConfigurationBuffer;
+	UINTN FeatureConfigurationBufferSize;
+	VOID* UsageSubscriptionBuffer;
+	UINTN UsageSubscriptionBufferSize;
+	VOID* DelayedUsageReportBuffer;
+	UINTN DelayedUsageReportBufferSize;
+	LOADER_FEATURE_CONFIGURATION_DIAGNOSTIC_INFORMATION DiagnosticInformation;
+} LOADER_FEATURE_CONFIGURATION_INFORMATION, *PLOADER_FEATURE_CONFIGURATION_INFORMATION;
+
+typedef struct _ETW_BOOT_CONFIG
+{
+	UINT32 MaxLoggers;
+	LIST_ENTRY BootLoggersList;
+} ETW_BOOT_CONFIG, *PETW_BOOT_CONFIG;
 
 typedef struct _LOADER_HIVE_RECOVERY_INFO {
 	struct {
@@ -619,7 +719,9 @@ typedef struct _LOADER_HIVE_RECOVERY_INFO {
 		//
 		UINT32 MostRecentLog : 3;
 		
-		UINT32 Spare		: ((sizeof(UINT32) * 8) - 5);
+		UINT32 LoadedFromSnapshot : 1;
+
+		UINT32 Spare		: ((sizeof(UINT32) * 8) - 7);
 	} s;
 
 	//
@@ -668,6 +770,8 @@ typedef struct _LOADER_PARAMETER_EXTENSION {
 
 	VOID* DrvDBImage; // Database used to identify "broken" drivers.
 	UINT32 DrvDBSize;
+	VOID* DrvDBPatchImage;
+	UINT32 DrvDBPatchSize;
 
 	// If booting from the Network (PXE) then we will
 	// save the Network boot params in this loader block
@@ -773,7 +877,15 @@ typedef struct _LOADER_PARAMETER_EXTENSION {
 		//
 		UINT32 DriverVerifierEnabled : 1;
 
-		UINT32 Unused : 8;
+		UINT32 SuppressMonitorX : 1;
+
+		UINT32 SuppressSmap : 1;
+
+		UINT32 PointerAuthKernelIpEnabled : 1;
+
+		UINT32 SplitLargeNumaNodes : 1;
+
+		UINT32 Unused : 3;
 
 		UINT32 FeatureSimulations : 6;
 
@@ -875,6 +987,13 @@ typedef struct _LOADER_PARAMETER_EXTENSION {
 	// List of HAL_EXTENSION_MODULE_ENTRY structures.
 	//
 	LIST_ENTRY HalExtensionModuleList;
+
+	//
+	// These two lists were added in ~10.0.20150.0
+	//
+	LIST_ENTRY PrmUpdateModuleList;
+
+	LIST_ENTRY PrmFirmwareModuleList;
 
 	//
 	// Contains most recent time from firmware, bootstat.dat and ntos build time.
@@ -1001,11 +1120,19 @@ typedef struct _LOADER_PARAMETER_EXTENSION {
 
 	INT64 SoftRestartTime;
 
+#if defined(_AMD64_)
+
 	VOID* HypercallCodeVa;
+
+#endif
+
+#if defined(_AMD64_) || defined(_ARM64_)
 
 	VOID* HalVirtualAddress;
 
 	UINT64 HalNumberOfBytes;
+
+#endif
 
 	PLEAP_SECOND_DATA LeapSecondData;
 
@@ -1039,13 +1166,60 @@ typedef struct _LOADER_PARAMETER_EXTENSION {
 
 	UINT32 RetpolineReserveSize;
 
+#if defined(_AMD64_)
 	struct
 	{
 		VOID* CodeBase;
 		UINTN CodeSize;
 	} MiniExecutive;
+#endif
 
 	VSM_PERFORMANCE_DATA VsmPerformanceData;
+
+	//
+	// Below fields added in ~10.0.20150.0
+	//
+	PNUMA_MEMORY_RANGE NumaMemoryRanges;
+
+	UINT32 NumaMemoryRangeCount;
+
+	UINT32 IommuFaultPolicy;
+
+	LOADER_FEATURE_CONFIGURATION_INFORMATION FeatureConfigurationInformation;
+
+	ETW_BOOT_CONFIG EtwBootConfig;
+
+	PBOOT_FIRMWARE_RAMDISK_INFO FwRamdiskInfo;
+
+	VOID* IpmiHwContext;
+
+#if defined(_AMD64_)
+
+	UINT64 IdleThreadShadowStack;
+
+	UINT64 TransitionShadowStack;
+
+	UINT64* IstShadowStacksTable;
+
+	UINT64 ReservedForKernelCet[2];
+
+	PMEMORY_MIRRORING_DATA MirroringData;
+
+#elif defined(_ARM64_)
+
+	UINT64 PointerAuthKernelIpKey[2];
+
+#endif
+
+	LARGE_INTEGER Luid;
+
+	struct {
+		PINSTALLED_MEMORY_RANGE Ranges;
+		UINT32 RangeCount;
+	} InstalledMemory;
+
+	LIST_ENTRY HotPatchList;
+
 } LOADER_PARAMETER_EXTENSION, *PLOADER_PARAMETER_EXTENSION;
 
 struct _HEADLESS_LOADER_BLOCK;
@@ -1189,16 +1363,21 @@ typedef struct _KLDR_DATA_TABLE_ENTRY {
 		struct {
 			UINT16 SignatureLevel : 4;
 			UINT16 SignatureType : 3;
-			UINT16 Unused : 9;
+			UINT16 Frozen : 2;
+			UINT16 HotPatch : 1;
+			UINT16 Unused : 6;
 		} s;
 		UINT16 EntireField;
-	} u;
+	} u1;
 	VOID* SectionPointer;
 	UINT32 CheckSum;
 	UINT32 CoverageSectionSize;
 	VOID* CoverageSection;
 	VOID* LoadedImports;
-	VOID* Spare;
+	union {
+		VOID* Spare;
+		struct _KLDR_DATA_TABLE_ENTRY* NtDataTableEntry;
+	} u2;
 
 	// Below fields are Win 10+ only
 	UINT32 SizeOfImageNotRounded;
@@ -1293,6 +1472,11 @@ typedef struct _LOADER_PARAMETER_BLOCK {
 	CHAR8* OsBootstatPathName;
 	CHAR8* ArcOSDataDeviceName;
 	CHAR8* ArcWindowsSysPartName;
+
+	//
+	// Below added in ~10.0.20150.0
+	//
+	RTL_RB_TREE MemoryDescriptorTree;
 } LOADER_PARAMETER_BLOCK, *PLOADER_PARAMETER_BLOCK;
 
 
