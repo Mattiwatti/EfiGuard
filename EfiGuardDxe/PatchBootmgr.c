@@ -69,7 +69,7 @@ HookedBootManagerImgArchStartBootApplication(
 	}
 
 	// Determine if we're starting winload.efi, bootmgr.efi (when booting a WIM), or something else
-	FileType = GetInputFileType((UINT8*)ImageBase, (UINTN)ImageSize);
+	FileType = GetInputFileType(ImageBase, (UINTN)ImageSize);
 	if (FileType != WinloadEfi && FileType != BootmgrEfi)
 	{
 		// Nothing for us to do
@@ -300,7 +300,7 @@ PatchBootManager(
 	// Found signature; backtrack to function start
 	// Note: pOriginalAddress is a pointer to a (function) pointer, because the original address depends on the type of boot manager we are patching.
 	VOID **pOriginalAddress = PatchingBootmgrEfi ? &gOriginalBootmgrImgArchStartBootApplication : &gOriginalBootmgfwImgArchStartBootApplication;
-	*pOriginalAddress = (VOID*)BacktrackToFunctionStart((UINT8*)ImageBase, NtHeaders, Found);
+	*pOriginalAddress = (VOID*)BacktrackToFunctionStart(ImageBase, NtHeaders, Found);
 	CONST VOID* OriginalAddress = *pOriginalAddress;
 	if (OriginalAddress == NULL)
 	{
@@ -325,7 +325,7 @@ PatchBootManager(
 	CopyMem(BackupAddress, (VOID*)OriginalAddress, sizeof(gHookTemplate));
 
 	// Place faux call (push addr, ret) at the start of the function to transfer execution to our hook
-	CopyMem((VOID*)OriginalAddress, (VOID*)gHookTemplate, sizeof(gHookTemplate));
+	CopyMem((VOID*)OriginalAddress, gHookTemplate, sizeof(gHookTemplate));
 	*(UINTN*)((UINT8*)OriginalAddress + 2) = (UINTN)HookAddress;
 
 	gBS->RestoreTPL(Tpl);
@@ -333,7 +333,7 @@ PatchBootManager(
 	// Patch ImgpValidateImageHash to allow custom boot loaders. This is completely
 	// optional (unless booting a custom winload.efi), and failures are ignored
 	PatchImgpValidateImageHash(FileType,
-								(UINT8*)ImageBase,
+								ImageBase,
 								NtHeaders);
 
 	if (BuildNumber >= 7600)
@@ -341,7 +341,7 @@ PatchBootManager(
 		// Patch ImgpFilterValidationFailure so it doesn't silently
 		// rat out every violation to a TPM or SI log. Also optional
 		PatchImgpFilterValidationFailure(FileType,
-										(UINT8*)ImageBase,
+										ImageBase,
 										NtHeaders);
 	}
 

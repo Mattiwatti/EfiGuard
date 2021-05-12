@@ -197,7 +197,7 @@ HookedLoadImage(
 		else
 		{
 			// Determine the type of file we're loading
-			CONST INPUT_FILETYPE FileType = GetInputFileType((UINT8*)LoadedImage->ImageBase, LoadedImage->ImageSize);
+			CONST INPUT_FILETYPE FileType = GetInputFileType(LoadedImage->ImageBase, LoadedImage->ImageSize);
 			ASSERT(FileType == Unknown || FileType == Bootmgr || FileType == BootmgfwEfi);
 
 			if (FileType == BootmgfwEfi)
@@ -263,7 +263,7 @@ HookedSetVariable(
 			Data != NULL)
 		{
 			// Yep, and Attributes and DataSize are correct. Check if *Data is a valid input for a backdoor read/write operation
-			EFIGUARD_BACKDOOR_DATA* BackdoorData = (EFIGUARD_BACKDOOR_DATA*)Data;
+			EFIGUARD_BACKDOOR_DATA* BackdoorData = Data;
 			if (BackdoorData->CookieValue == EFIGUARD_BACKDOOR_COOKIE_VALUE &&
 				BackdoorData->Size > 0 &&
 				(UINTN)BackdoorData->KernelAddress >= (UINTN)MM_SYSTEM_RANGE_START)
@@ -306,7 +306,7 @@ HookedSetVariable(
 						}
 						case 8:
 						{
-							CONST UINT64 NewQword = (UINT64)BackdoorData->u.Qword;
+							CONST UINT64 NewQword = BackdoorData->u.Qword;
 							BackdoorData->u.Qword = *(UINT64*)BackdoorData->KernelAddress;
 							if (!BackdoorData->IsReadOperation)
 								*(UINT64*)BackdoorData->KernelAddress = NewQword;
@@ -602,7 +602,7 @@ EfiGuardInitialize(
 	//
 	// Hook gRT->SetVariable
 	//
-	mOriginalSetVariable = (EFI_SET_VARIABLE)SetServicePointer(&gRT->Hdr, (VOID**)&gRT->SetVariable, (VOID**)&HookedSetVariable);
+	mOriginalSetVariable = (EFI_SET_VARIABLE)SetServicePointer(&gRT->Hdr, (VOID**)&gRT->SetVariable, (VOID*)&HookedSetVariable);
 	Print(L"Hooked gRT->SetVariable: 0x%p -> 0x%p\r\n", (VOID*)mOriginalSetVariable, (VOID*)&HookedSetVariable);
 
 	// Register notification callback for ExitBootServices()

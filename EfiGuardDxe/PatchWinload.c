@@ -232,11 +232,11 @@ PatchImgpFilterValidationFailure(
 	{
 		if (CompareMem(Section->Name, ".text", sizeof(".text") - 1) == 0)
 			CodeSection = Section;
-		if ((FileType == BootmgfwEfi || FileType == BootmgrEfi) &&
+		if (((FileType == BootmgfwEfi || FileType == BootmgrEfi) &&
 			CompareMem(Section->Name, ".text", sizeof(".text") - 1) == 0) // [bootmgfw|bootmgr].efi (usually) has no .rdata section, and starting at .text is always fine
-			PatternSection = Section;
-		else if ((FileType == WinloadExe || FileType == WinloadEfi) &&
-			CompareMem(Section->Name, ".rdata", sizeof(".rdata") - 1) == 0) // For winload.[exe|efi] the string is in .rdata
+			||
+			((FileType == WinloadExe || FileType == WinloadEfi) &&
+			CompareMem(Section->Name, ".rdata", sizeof(".rdata") - 1) == 0)) // For winload.[exe|efi] the string is in .rdata
 			PatternSection = Section;
 		Section++;
 	}
@@ -249,7 +249,7 @@ PatchImgpFilterValidationFailure(
 	CONST UINT8* PatternStartVa = ImageBase + PatternStartRva;
 
 	CHAR8 SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME + 1];
-	CopyMem((VOID*)SectionName, (VOID*)PatternSection->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
+	CopyMem(SectionName, PatternSection->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
 	SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME] = '\0';
 	Print(L"\r\n== Searching for load failure string in %a [RVA: 0x%X - 0x%X] ==\r\n",
 		SectionName, PatternStartRva, PatternStartRva + PatternSizeOfRawData);
@@ -278,8 +278,8 @@ PatchImgpFilterValidationFailure(
 	CONST UINT32 CodeSizeOfRawData = CodeSection->SizeOfRawData;
 	CONST UINT8* CodeStartVa = ImageBase + CodeStartRva;
 
-	ZeroMem((VOID*)SectionName, sizeof(SectionName));
-	CopyMem((VOID*)SectionName, (VOID*)CodeSection->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
+	ZeroMem(SectionName, sizeof(SectionName));
+	CopyMem(SectionName, CodeSection->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
 	Print(L"== Disassembling %a to find %S!ImgpFilterValidationFailure ==\r\n", SectionName, ShortName);
 	UINT8* LeaIntegrityFailureAddress = NULL;
 
@@ -604,7 +604,7 @@ PatchWinload(
 			FindPattern(SigBlStatusPrint,
 						0xCC,
 						sizeof(SigBlStatusPrint),
-						(VOID*)((UINT8*)ImageBase + CodeSection->VirtualAddress),
+						(UINT8*)ImageBase + CodeSection->VirtualAddress,
 						CodeSection->SizeOfRawData,
 						(VOID**)&gBlStatusPrint);
 			if (gBlStatusPrint == NULL)
@@ -616,7 +616,7 @@ PatchWinload(
 	}
 
 	// Find winload!OslFwpKernelSetupPhase1
-	Status = FindOslFwpKernelSetupPhase1((UINT8*)ImageBase,
+	Status = FindOslFwpKernelSetupPhase1(ImageBase,
 										NtHeaders,
 										CodeSection,
 										PatternSection,
@@ -636,7 +636,7 @@ PatchWinload(
 	CopyMem(gOslFwpKernelSetupPhase1Backup, (VOID*)gOriginalOslFwpKernelSetupPhase1, sizeof(gOslFwpKernelSetupPhase1Backup));
 
 	// Place faux call (push addr, ret) at the start of the function to transfer execution to our hook
-	CopyMem((VOID*)gOriginalOslFwpKernelSetupPhase1, (VOID*)gHookTemplate, sizeof(gHookTemplate));
+	CopyMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gHookTemplate, sizeof(gHookTemplate));
 	*(UINTN*)((UINT8*)gOriginalOslFwpKernelSetupPhase1 + 2) = (UINTN)&HookedOslFwpKernelSetupPhase1;
 
 	gBS->RestoreTPL(Tpl);
@@ -644,7 +644,7 @@ PatchWinload(
 	// Patch ImgpValidateImageHash to allow custom boot loaders. This is completely
 	// optional (unless booting a custom ntoskrnl.exe), and failures are ignored
 	PatchImgpValidateImageHash(WinloadEfi,
-								(UINT8*)ImageBase,
+								ImageBase,
 								NtHeaders);
 
 	if (BuildNumber >= 7600)
@@ -652,7 +652,7 @@ PatchWinload(
 		// Patch ImgpFilterValidationFailure so it doesn't silently
 		// rat out every violation to a TPM or SI log. Also optional
 		PatchImgpFilterValidationFailure(WinloadEfi,
-										(UINT8*)ImageBase,
+										ImageBase,
 										NtHeaders);
 	}
 

@@ -107,7 +107,7 @@ GetInputFileType(
 	// Brute force scan .rsrc to check if this is either winload.efi or bootmgr.efi.
 	// We've already eliminated bootmgr and bootmgfw.efi as candidates, so there will be no false positives
 	UINT32 Size = 0;
-	EFI_IMAGE_RESOURCE_DIRECTORY *ResourceDirTable = (EFI_IMAGE_RESOURCE_DIRECTORY*)
+	EFI_IMAGE_RESOURCE_DIRECTORY *ResourceDirTable =
 		RtlpImageDirectoryEntryToDataEx(ImageBase,
 										TRUE,
 										EFI_IMAGE_DIRECTORY_ENTRY_RESOURCE,
@@ -222,7 +222,7 @@ FindIATAddressForImport(
 
 	// Get the import descriptor table
 	UINT32 ImportDirSize;
-	CONST PIMAGE_IMPORT_DESCRIPTOR DescriptorTable = (PIMAGE_IMPORT_DESCRIPTOR)
+	CONST PIMAGE_IMPORT_DESCRIPTOR DescriptorTable =
 		RtlpImageDirectoryEntryToDataEx(ImageBase,
 										TRUE,
 										EFI_IMAGE_DIRECTORY_ENTRY_IMPORT,
@@ -365,10 +365,10 @@ RtlpImageDirectoryEntryToDataEx(
 	*Size = Directories[DirectoryEntry].Size;
 	if (MappedAsImage || Rva < HEADER_FIELD(NtHeaders, SizeOfHeaders))
 	{
-		return (VOID*)((UINT8*)(Base) + Rva);
+		return (UINT8*)(Base) + Rva;
 	}
 
-	return (VOID*)((UINT8*)(Base) + RvaToOffset(NtHeaders, Rva));
+	return (UINT8*)(Base) + RvaToOffset(NtHeaders, Rva);
 }
 
 // Similar to LdrFindResource_U + LdrAccessResource combined, with some shortcuts for size optimization:
@@ -398,7 +398,7 @@ FindResourceDataById(
 	ASSERT((!LDR_IS_DATAFILE(ImageBase)));
 
 	UINT32 Size = 0;
-	EFI_IMAGE_RESOURCE_DIRECTORY *ResourceDirTable = (EFI_IMAGE_RESOURCE_DIRECTORY*)
+	EFI_IMAGE_RESOURCE_DIRECTORY *ResourceDirTable =
 		RtlpImageDirectoryEntryToDataEx(ImageBase,
 										TRUE,
 										EFI_IMAGE_DIRECTORY_ENTRY_RESOURCE,

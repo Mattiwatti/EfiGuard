@@ -68,7 +68,7 @@ AppendKernelPatchMessage(
 	gKernelPatchInfo.BufferSize += (NumCharsPrinted * sizeof(CHAR16));
 
 	// Paranoid null terminator (UnicodeVSPrint should do this)
-	*(CHAR16*)(gKernelPatchInfo.Buffer + (gKernelPatchInfo.BufferSize / sizeof(CHAR16))) = CHAR_NULL;
+	*(gKernelPatchInfo.Buffer + (gKernelPatchInfo.BufferSize / sizeof(CHAR16))) = CHAR_NULL;
 
 	// Separate the next message using the null terminator. This is because most Print() implementations crap out
 	// after ~4 lines (depending on PCDs), so we will print the final buffer using multiple calls to Print()

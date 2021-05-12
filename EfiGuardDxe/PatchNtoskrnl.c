@@ -99,7 +99,7 @@ DisablePatchGuard(
 	// Search for KeInitAmd64SpecificState
 	PRINT_KERNEL_PATCH_MSG(L"\r\n== Searching for nt!KeInitAmd64SpecificState pattern in INIT ==\r\n");
 	UINT8* KeInitAmd64SpecificStatePatternAddress = NULL;
-	for (UINT8* Address = (UINT8*)StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKeInitAmd64SpecificState); ++Address)
+	for (UINT8* Address = StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKeInitAmd64SpecificState); ++Address)
 	{
 		if (CompareMem(Address, SigKeInitAmd64SpecificState, sizeof(SigKeInitAmd64SpecificState)) == 0)
 		{
@@ -265,7 +265,7 @@ DisablePatchGuard(
 		CONST EFI_STATUS FindKiVerifyScopesExecuteStatus = FindPattern(SigKiVerifyScopesExecute,
 																	0xCC,
 																	sizeof(SigKiVerifyScopesExecute),
-																	(VOID*)StartVa,
+																	StartVa,
 																	SizeOfRawData,
 																	(VOID**)&KiVerifyScopesExecutePatternAddress);
 		if (EFI_ERROR(FindKiVerifyScopesExecuteStatus))
@@ -296,7 +296,7 @@ DisablePatchGuard(
 		// Search for KiMcaDeferredRecoveryService
 		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiMcaDeferredRecoveryService pattern in .text ==\r\n");
 		UINT8* KiMcaDeferredRecoveryService = NULL;
-		for (UINT8* Address = (UINT8*)StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKiMcaDeferredRecoveryService); ++Address)
+		for (UINT8* Address = StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKiMcaDeferredRecoveryService); ++Address)
 		{
 			if (CompareMem(Address, SigKiMcaDeferredRecoveryService, sizeof(SigKiMcaDeferredRecoveryService)) == 0)
 			{
@@ -365,7 +365,7 @@ DisablePatchGuard(
 		CONST EFI_STATUS FindKiSwInterruptStatus = FindPattern(SigKiSwInterrupt,
 																0xCC,
 																sizeof(SigKiSwInterrupt),
-																(VOID*)StartVa,
+																StartVa,
 																SizeOfRawData,
 																(VOID**)&KiSwInterruptPatternAddress);
 		if (EFI_ERROR(FindKiSwInterruptStatus))
@@ -614,7 +614,7 @@ DisableDSE(
 				Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Instruction.operands[0].mem.base == ZYDIS_REGISTER_RIP &&
 				Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER)
 			{
-				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, (ZyanU64*)&gCiEnabled)))
+				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &gCiEnabled)))
 				{
 					PRINT_KERNEL_PATCH_MSG(L"    Found g_CiEnabled at 0x%llX.\r\n", gCiEnabled);
 					break;
@@ -709,7 +709,7 @@ DisableDSE(
 	if (BuildNumber < 9200)
 		*SeValidateImageDataJzAddress = 0xEB;															// jmp
 	else if (BypassType == DSE_DISABLE_AT_BOOT)
-		*(UINT32*)((UINT8*)SeValidateImageDataMovEaxAddress + 1 /*skip existing mov opcode*/) = 0x0;	// mov eax, 0
+		*(UINT32*)(SeValidateImageDataMovEaxAddress + 1 /*skip existing mov opcode*/) = 0x0;	// mov eax, 0
 
 	if (BuildNumber >= 16299 && BypassType == DSE_DISABLE_AT_BOOT)
 	{
@@ -728,7 +728,7 @@ DisableDSE(
 		}
 		else
 		{
-			CopyMem((VOID*)Found, (VOID*)SeCodeIntegrityQueryInformationPatch, sizeof(SeCodeIntegrityQueryInformationPatch));
+			CopyMem(Found, SeCodeIntegrityQueryInformationPatch, sizeof(SeCodeIntegrityQueryInformationPatch));
 			PRINT_KERNEL_PATCH_MSG(L"\r\nPatched SeCodeIntegrityQueryInformation [RVA: 0x%X].\r\n", (UINT32)(Found - ImageBase));
 		}
 	}
@@ -751,7 +751,7 @@ PatchNtoskrnl(
 	// Print file and version info
 	UINT16 MajorVersion = 0, MinorVersion = 0, BuildNumber = 0, Revision = 0;
 	UINT32 FileFlags = 0;
-	EFI_STATUS Status = GetPeFileVersionInfo((VOID*)ImageBase, &MajorVersion, &MinorVersion, &BuildNumber, &Revision, &FileFlags);
+	EFI_STATUS Status = GetPeFileVersionInfo(ImageBase, &MajorVersion, &MinorVersion, &BuildNumber, &Revision, &FileFlags);
 	if (EFI_ERROR(Status))
 	{
 		PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] WARNING: failed to obtain ntoskrnl.exe version info. Status: %llx\r\n", Status);
@@ -804,7 +804,7 @@ PatchNtoskrnl(
 	// Patch INIT and .text sections to disable PatchGuard
 	PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] Disabling PatchGuard... [INIT RVA: 0x%X - 0x%X]\r\n",
 		InitSection->VirtualAddress, InitSection->VirtualAddress + InitSection->SizeOfRawData);
-	Status = DisablePatchGuard((UINT8*)ImageBase,
+	Status = DisablePatchGuard(ImageBase,
 								NtHeaders,
 								InitSection,
 								TextSection,
@@ -821,7 +821,7 @@ PatchNtoskrnl(
 		PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] %S... [PAGE RVA: 0x%X - 0x%X]\r\n",
 			gDriverConfig.DseBypassMethod == DSE_DISABLE_AT_BOOT ? L"Disabling DSE" : L"Ensuring safe DSE bypass",
 			PageSection->VirtualAddress, PageSection->VirtualAddress + PageSection->SizeOfRawData);
-		Status = DisableDSE((UINT8*)ImageBase,
+		Status = DisableDSE(ImageBase,
 							NtHeaders,
 							PageSection,
 							gDriverConfig.DseBypassMethod,
