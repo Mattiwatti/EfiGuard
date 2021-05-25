@@ -44,6 +44,14 @@ MapFileSectionView(
 	_Out_ PSIZE_T ViewSize
 	);
 
+BOOLEAN
+AddressIsInSection(
+	_In_ PUCHAR ImageBase,
+	_In_ PUCHAR Address,
+	_In_ PIMAGE_NT_HEADERS NtHeaders,
+	_In_ PCCH SectionName
+	);
+
 PVOID
 GetProcedureAddress(
 	_In_ ULONG_PTR DllBase,

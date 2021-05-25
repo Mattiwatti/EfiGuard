@@ -110,6 +110,35 @@ MapFileSectionView(
 	return Status;
 }
 
+BOOLEAN
+AddressIsInSection(
+	_In_ PUCHAR ImageBase,
+	_In_ PUCHAR Address,
+	_In_ PIMAGE_NT_HEADERS NtHeaders,
+	_In_ PCCH SectionName
+	)
+{
+	if (ImageBase > Address)
+		return FALSE;
+	if (Address >= ImageBase + NtHeaders->OptionalHeader.SizeOfImage)
+		return FALSE;
+
+	const ULONG Rva = static_cast<ULONG>(static_cast<ULONG_PTR>(Address - ImageBase));
+	PIMAGE_SECTION_HEADER Section = IMAGE_FIRST_SECTION(NtHeaders);
+	const USHORT NumberOfSections = NtHeaders->FileHeader.NumberOfSections;
+	for (USHORT i = 0; i < NumberOfSections; ++i)
+	{
+		if (Section->VirtualAddress <= Rva &&
+			Section->VirtualAddress + Section->Misc.VirtualSize > Rva)
+		{
+			if (strncmp(reinterpret_cast<PCCH>(Section->Name), SectionName, IMAGE_SIZEOF_SHORT_NAME) == 0)
+				return TRUE;
+		}
+		Section++;
+	}
+	return FALSE;
+}
+
 PVOID
 GetProcedureAddress(
 	_In_ ULONG_PTR DllBase,
