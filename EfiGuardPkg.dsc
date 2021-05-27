@@ -46,6 +46,14 @@
 !endif
   DebugPrintErrorLevelLib|MdePkg/Library/BaseDebugPrintErrorLevelLib/BaseDebugPrintErrorLevelLib.inf
 
+  # Note [2021-05-27]: the current EDK2 master branch, and releases starting from edk2-stable202105, require an instance of the new 'RegisterFilterLib' in order to use BaseLib, even if you do not use RegisterFilterLib:
+  # https://github.com/tianocore/edk2/commit/1c11e7a2142b1406ccff5e0af0893c94472871c8
+  # Since there is no macro available to determine the version of EDK2, the build *has* to be broken for either master/latest *or* any even slightly-older-than-latest releases because of this trivial issue.
+  # The following line therefore fixes builds when compiling with recent EDK2 versions, but breaks builds when compiling with EDK2 versions older than edk2-stable202105.
+  #
+  # TLDR: if you receive an error along the lines of 'RegisterFilterLibNull.inf not found in packages path', you can simply comment out the following line, since it does nothing useful:
+  RegisterFilterLib|MdePkg/Library/RegisterFilterLibNull/RegisterFilterLibNull.inf
+
 [LibraryClasses.common.DXE_DRIVER, LibraryClasses.common.DXE_RUNTIME_DRIVER, LibraryClasses.common.DXE_SMM_DRIVER, LibraryClasses.common.UEFI_DRIVER]
   PcdLib|MdePkg/Library/DxePcdLib/DxePcdLib.inf
   BaseMemoryLib|MdePkg/Library/BaseMemoryLibOptDxe/BaseMemoryLibOptDxe.inf
