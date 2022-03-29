@@ -75,6 +75,10 @@
   DxeServicesTableLib|MdePkg/Library/DxeServicesTableLib/DxeServicesTableLib.inf
   PeCoffGetEntryPointLib|MdePkg/Library/BasePeCoffGetEntryPointLib/BasePeCoffGetEntryPointLib.inf
   HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
+
+  # Note [2022-03-30]: same issue as above, but with VariablePolicyHelperLib instead of RegisterFilterLib (since edk2-stable202202):
+  # https://github.com/tianocore/edk2/commit/f4b7b473b4afd0093768905529bfae09a2061d41
+  VariablePolicyHelperLib|MdeModulePkg/Library/VariablePolicyHelperLib/VariablePolicyHelperLib.inf
   UefiBootManagerLib|MdeModulePkg/Library/UefiBootManagerLib/UefiBootManagerLib.inf
 
 [Components]
