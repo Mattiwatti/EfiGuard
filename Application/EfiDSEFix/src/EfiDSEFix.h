@@ -140,7 +140,14 @@ Printf(
 	va_list VaList;
 	va_start(VaList, Format);
 	ULONG N = _vsnwprintf(Buffer, sizeof(Buffer) / sizeof(WCHAR) - 1, Format, VaList);
+#if defined(_NATIVE)
+	UNREFERENCED_PARAMETER(N);
+	UNICODE_STRING String;
+	RtlInitUnicodeString(&String, Buffer);
+	NtDisplayString(&String);
+#else
 	WriteConsoleW(NtCurrentPeb()->ProcessParameters->StandardOutput, Buffer, N, &N, NULL);
+#endif
 	va_end(VaList);
 }
 

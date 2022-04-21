@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release (native subsystem)|x64">
+      <Configuration>Release (native subsystem)</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
@@ -16,6 +20,14 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (native subsystem)|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -76,9 +88,48 @@
       <SetChecksum>true</SetChecksum>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release (native subsystem)|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PreprocessorDefinitions>WINVER=0x0600;_WIN32_WINNT=0x0600;NTDDI_VERSION=0x06000200;WIN32;_WIN64;NDEBUG;_NATIVE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DiagnosticsFormat>Caret</DiagnosticsFormat>
+      <StringPooling>true</StringPooling>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/Gw /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <DisableSpecificWarnings>4201</DisableSpecificWarnings>
+      <ExceptionHandling>false</ExceptionHandling>
+      <OmitFramePointers>true</OmitFramePointers>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Include;$(SolutionDir)../MdePkg/Include;$(SolutionDir)../MdePkg/Include/X64;$(SolutionDir)../MdeModulePkg/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Native</SubSystem>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <Version>6.0</Version>
+      <MinimumRequiredVersion>6.0</MinimumRequiredVersion>
+      <AdditionalLibraryDirectories>$(SolutionDir)Application\EfiDSEFix\lib\x64</AdditionalLibraryDirectories>
+      <EntryPointSymbol>NtProcessStartupW</EntryPointSymbol>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalOptions>/NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>ntdllp.lib</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
+      <GenerateMapFile>true</GenerateMapFile>
+      <SetChecksum>true</SetChecksum>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="hde\hde64.c">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MinSpace</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Release (native subsystem)|x64'">MinSpace</Optimization>
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="EfiDSEFix.cpp" />

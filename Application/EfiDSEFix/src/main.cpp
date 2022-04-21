@@ -242,6 +242,6 @@ NtProcessStartupW(
 					&NumChars);
 
 	// Call the main function and terminate with the exit status
-	const NTSTATUS Status = wmain(Argc, Argv);
+	const NTSTATUS Status = wmain(static_cast<int>(Argc), Argv);
 	return NtTerminateProcess(NtCurrentProcess, Status);
 }
