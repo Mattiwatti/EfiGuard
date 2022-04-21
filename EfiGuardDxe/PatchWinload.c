@@ -41,7 +41,7 @@ BlStatusPrintNoop(
 	...
 	)
 {
-	return 0xC00000BBL; // STATUS_NOT_SUPPORTED
+	return (NTSTATUS)0xC00000BBL; // STATUS_NOT_SUPPORTED
 }
 
 t_BlStatusPrint gBlStatusPrint = BlStatusPrintNoop;

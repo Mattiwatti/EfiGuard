@@ -589,7 +589,7 @@ DisableDSE(
 		return EFI_NOT_FOUND;
 	}
 
-	UINTN gCiEnabled = 0;
+	ZyanU64 gCiEnabled = 0;
 	if (BuildNumber < 9200)
 	{
 		// On Windows Vista/7, find g_CiEnabled now because it's a few bytes away and we'll it need later
