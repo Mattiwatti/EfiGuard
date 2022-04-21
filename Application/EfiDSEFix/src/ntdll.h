@@ -29,13 +29,25 @@ extern "C" {
 #define _Reserved_
 #endif
 
-#if (defined(_MSC_VER) && (_MSC_VER >= 1800)) || defined(__clang__)
-#if (!defined(__RESHARPER__)) && (!defined(__INTELLISENSE__))
+#if (defined(_MSC_VER) && !defined(__clang__))
+#define BUILTIN_OFFSETOF_REQUIRES_CPP (_MSC_VER < 9999 ? 1 : 0) // Update this number if/when MS ever fix this
+#else
+#define BUILTIN_OFFSETOF_REQUIRES_CPP 0
+#endif
+
+#if ((!BUILTIN_OFFSETOF_REQUIRES_CPP || defined(__cplusplus)) && \
+	((defined(_MSC_VER) && (_MSC_VER >= 1800)) || \
+	defined(__clang__)) && \
+	(!defined(__RESHARPER__) && !defined(__INTELLISENSE__)))
 #undef FIELD_OFFSET
 #undef UFIELD_OFFSET
 #define FIELD_OFFSET(type, field)	((LONG)(LONG_PTR)__builtin_offsetof(type, field))
 #define UFIELD_OFFSET(type, field)	((ULONG)(LONG_PTR)__builtin_offsetof(type, field))
-#endif
+
+#undef CONTAINING_RECORD
+#define CONTAINING_RECORD(address, type, field)	((type *)( \
+												(PCHAR)(address) - \
+												(ULONG_PTR)(__builtin_offsetof(type, field))))
 #endif
 
 #define PAGE_SIZE					0x1000
@@ -231,15 +243,21 @@ __pragma(warning(disable:4221)) __pragma(warning(disable:4204)) \
 static UNICODE_STRING _var = { 0, (_size) * sizeof(WCHAR) , _var ## _buffer } \
 __pragma(warning(pop))
 
-#if defined(__clang__)
-#define RTL_CONSTANT_STRING(s) \
-__pragma(clang diagnostic push) \
-__pragma(clang diagnostic ignored "-Wwritable-strings") \
-{ sizeof(s) - sizeof((s)[0]), sizeof(s), s } \
-__pragma(clang diagnostic pop)
+#if !defined(__cplusplus)
+#define RTL_CONSTANT_STRING(s) { sizeof(s) - sizeof(*(s)), sizeof(s), (PWSTR)(s) }
+#define RTL_CONSTANT_ANSI_STRING(s) { sizeof(s) - sizeof(*(s)), sizeof(s), (PSTR)(s) }
 #else
-#define RTL_CONSTANT_STRING(s) { sizeof(s) - sizeof((s)[0]), sizeof(s), (PWSTR)s }
-#define RTL_CONSTANT_ANSI_STRING(s) { sizeof(s) - sizeof((s)[0]), sizeof(s), (PSTR)s }
+extern "C++"
+{
+	template <typename T> struct remove_constref { typedef T type; };
+	template <typename T> struct remove_constref<const T> { typedef T type; };
+	template <typename T> struct remove_constref<T&> { typedef T type; };
+	template <typename T> struct remove_constref<const T&> { typedef T type; };
+	template <typename T> struct remove_constref<T&&> { typedef T type; };
+	template <typename T> struct remove_constref<const T&&> { typedef T type; };
+}
+#define RTL_CONSTANT_STRING(s) { sizeof(s) - sizeof(*(s)), sizeof(s), (remove_constref<decltype(*(s))>::type*)(s) }
+#define RTL_CONSTANT_ANSI_STRING(s) RTL_CONSTANT_STRING(s)
 #endif
 
 FORCEINLINE
@@ -307,7 +325,7 @@ typedef struct _SYSTEM_THREAD_INFORMATION
 	KPRIORITY Priority;
 	LONG BasePriority;
 	ULONG ContextSwitches;
-	ULONG ThreadState;
+	KTHREAD_STATE ThreadState;
 	KWAIT_REASON WaitReason;
 } SYSTEM_THREAD_INFORMATION, *PSYSTEM_THREAD_INFORMATION;
 
@@ -495,6 +513,12 @@ typedef struct _FILE_POSITION_INFORMATION
 {
 	LARGE_INTEGER CurrentByteOffset;
 } FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;
+
+typedef struct _FILE_PROCESS_IDS_USING_FILE_INFORMATION
+{
+	ULONG NumberOfProcessIdsInList;
+	ULONG_PTR ProcessIdList[1];
+} FILE_PROCESS_IDS_USING_FILE_INFORMATION, *PFILE_PROCESS_IDS_USING_FILE_INFORMATION;
 
 // Privileges
 #define SE_MIN_WELL_KNOWN_PRIVILEGE (2L)
@@ -689,9 +713,12 @@ typedef struct _THREAD_LAST_SYSCALL_INFORMATION
 {
 	PVOID FirstArgument;
 	USHORT SystemCallNumber;
-#if NTDDI_VERSION >= NTDDI_WINBLUE
-	ULONG64 WaitTime; // may be omitted
+#ifdef _WIN64
+	USHORT Pad[0x3];
+#else
+	USHORT Pad[0x1];
 #endif
+	ULONG64 WaitTime; // may be omitted
 } THREAD_LAST_SYSCALL_INFORMATION, *PTHREAD_LAST_SYSCALL_INFORMATION;
 
 typedef struct _OBJECT_ATTRIBUTES {
@@ -995,6 +1022,30 @@ typedef struct _OBJECT_HANDLE_FLAG_INFORMATION
 	BOOLEAN Inherit;
 	BOOLEAN ProtectFromClose;
 } OBJECT_HANDLE_FLAG_INFORMATION, *POBJECT_HANDLE_FLAG_INFORMATION;
+
+typedef struct _OBJECT_DIRECTORY_INFORMATION {
+	UNICODE_STRING Name;
+	UNICODE_STRING TypeName;
+} OBJECT_DIRECTORY_INFORMATION, *POBJECT_DIRECTORY_INFORMATION;
+
+typedef struct _SYSTEM_BIGPOOL_ENTRY
+{
+	union {
+		PVOID VirtualAddress;
+		ULONG_PTR NonPaged : 1;
+	} u1;
+	SIZE_T SizeInBytes;
+	union {
+		UCHAR Tag[4];
+		ULONG TagUlong;
+	} u2;
+} SYSTEM_BIGPOOL_ENTRY, *PSYSTEM_BIGPOOL_ENTRY;
+
+typedef struct _SYSTEM_BIGPOOL_INFORMATION
+{
+	ULONG Count;
+	SYSTEM_BIGPOOL_ENTRY AllocatedInfo[1];
+} SYSTEM_BIGPOOL_INFORMATION, *PSYSTEM_BIGPOOL_INFORMATION;
 
 typedef struct _DBGKM_EXCEPTION
 {
@@ -1361,13 +1412,13 @@ typedef struct _RTL_BALANCED_NODE
 			struct _RTL_BALANCED_NODE *Left;
 			struct _RTL_BALANCED_NODE *Right;
 		} s;
-	};
+	} u1;
 	union
 	{
 		UCHAR Red : 1;
 		UCHAR Balance : 2;
 		ULONG_PTR ParentValue;
-	} u;
+	} u2;
 } RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
 
 typedef struct _LDR_DATA_TABLE_ENTRY
@@ -1646,7 +1697,7 @@ typedef struct _PS_STD_HANDLE_INFO
 			ULONG StdHandleState : 2; // PS_STD_HANDLE_STATE
 			ULONG PseudoHandleMask : 3; // PS_STD_*
 		} s;
-	};
+	} u;
 	ULONG StdHandleSubsystemType;
 } PS_STD_HANDLE_INFO, *PPS_STD_HANDLE_INFO;
 
@@ -1724,7 +1775,7 @@ typedef struct _PS_CREATE_INFO
 					UCHAR SpareBits2 : 8;
 					USHORT ProhibitedImageCharacteristics : 16;
 				} s1;
-			} u1;
+			} u2;
 			ACCESS_MASK AdditionalFileAccess;
 		} InitState;
 
@@ -1763,7 +1814,7 @@ typedef struct _PS_CREATE_INFO
 					UCHAR SpareBits2 : 8;
 					USHORT SpareBits3 : 16;
 				} s2;
-			} u2;
+			} u3;
 			HANDLE FileHandle;
 			HANDLE SectionHandle;
 			ULONGLONG UserProcessParametersNative;
@@ -1774,7 +1825,7 @@ typedef struct _PS_CREATE_INFO
 			ULONGLONG ManifestAddress;
 			ULONG ManifestSize;
 		} SuccessState;
-	};
+	} u1;
 } PS_CREATE_INFO, *PPS_CREATE_INFO;
 
 #define PROCESS_CREATE_FLAGS_BREAKAWAY				0x00000001
@@ -2187,6 +2238,58 @@ typedef enum _THREADINFOCLASS
 	MaxThreadInfoClass
 } THREADINFOCLASS;
 
+// JOBOBJECTINFOCLASS
+// Source: http://processhacker.sourceforge.net
+// Note: We don't use an enum since it conflicts with the Windows SDK.
+#define JobObjectBasicAccountingInformation			((JOBOBJECTINFOCLASS)1) // JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
+#define JobObjectBasicLimitInformation				((JOBOBJECTINFOCLASS)2) // JOBOBJECT_BASIC_LIMIT_INFORMATION
+#define JobObjectBasicProcessIdList					((JOBOBJECTINFOCLASS)3) // JOBOBJECT_BASIC_PROCESS_ID_LIST
+#define JobObjectBasicUIRestrictions				((JOBOBJECTINFOCLASS)4) // JOBOBJECT_BASIC_UI_RESTRICTIONS
+#define JobObjectSecurityLimitInformation			((JOBOBJECTINFOCLASS)5) // JOBOBJECT_SECURITY_LIMIT_INFORMATION
+#define JobObjectEndOfJobTimeInformation			((JOBOBJECTINFOCLASS)6) // JOBOBJECT_END_OF_JOB_TIME_INFORMATION
+#define JobObjectAssociateCompletionPortInformation	((JOBOBJECTINFOCLASS)7) // JOBOBJECT_ASSOCIATE_COMPLETION_PORT
+#define JobObjectBasicAndIoAccountingInformation	((JOBOBJECTINFOCLASS)8) // JOBOBJECT_BASIC_AND_IO_ACCOUNTING_INFORMATION
+#define JobObjectExtendedLimitInformation			((JOBOBJECTINFOCLASS)9) // JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+#define JobObjectJobSetInformation					((JOBOBJECTINFOCLASS)10) // JOBOBJECT_JOBSET_INFORMATION
+#define JobObjectGroupInformation					((JOBOBJECTINFOCLASS)11) // USHORT
+#define JobObjectNotificationLimitInformation		((JOBOBJECTINFOCLASS)12) // JOBOBJECT_NOTIFICATION_LIMIT_INFORMATION
+#define JobObjectLimitViolationInformation			((JOBOBJECTINFOCLASS)13) // JOBOBJECT_LIMIT_VIOLATION_INFORMATION
+#define JobObjectGroupInformationEx					((JOBOBJECTINFOCLASS)14) // GROUP_AFFINITY (ARRAY)
+#define JobObjectCpuRateControlInformation			((JOBOBJECTINFOCLASS)15) // JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
+#define JobObjectCompletionFilter					((JOBOBJECTINFOCLASS)16)
+#define JobObjectCompletionCounter					((JOBOBJECTINFOCLASS)17)
+#define JobObjectFreezeInformation					((JOBOBJECTINFOCLASS)18) // JOBOBJECT_FREEZE_INFORMATION
+#define JobObjectExtendedAccountingInformation		((JOBOBJECTINFOCLASS)19) // JOBOBJECT_EXTENDED_ACCOUNTING_INFORMATION
+#define JobObjectWakeInformation					((JOBOBJECTINFOCLASS)20) // JOBOBJECT_WAKE_INFORMATION
+#define JobObjectBackgroundInformation				((JOBOBJECTINFOCLASS)21)
+#define JobObjectSchedulingRankBiasInformation		((JOBOBJECTINFOCLASS)22)
+#define JobObjectTimerVirtualizationInformation		((JOBOBJECTINFOCLASS)23)
+#define JobObjectCycleTimeNotification				((JOBOBJECTINFOCLASS)24)
+#define JobObjectClearEvent							((JOBOBJECTINFOCLASS)25)
+#define JobObjectInterferenceInformation			((JOBOBJECTINFOCLASS)26) // JOBOBJECT_INTERFERENCE_INFORMATION
+#define JobObjectClearPeakJobMemoryUsed				((JOBOBJECTINFOCLASS)27)
+#define JobObjectMemoryUsageInformation				((JOBOBJECTINFOCLASS)28) // JOBOBJECT_MEMORY_USAGE_INFORMATION // JOBOBJECT_MEMORY_USAGE_INFORMATION_V2
+#define JobObjectSharedCommit						((JOBOBJECTINFOCLASS)29)
+#define JobObjectContainerId						((JOBOBJECTINFOCLASS)30)
+#define JobObjectIoRateControlInformation			((JOBOBJECTINFOCLASS)31)
+#define JobObjectNetRateControlInformation			((JOBOBJECTINFOCLASS)32) // JOBOBJECT_NET_RATE_CONTROL_INFORMATION
+#define JobObjectNotificationLimitInformation2		((JOBOBJECTINFOCLASS)33) // JOBOBJECT_NOTIFICATION_LIMIT_INFORMATION_2
+#define JobObjectLimitViolationInformation2			((JOBOBJECTINFOCLASS)34) // JOBOBJECT_LIMIT_VIOLATION_INFORMATION_2
+#define JobObjectCreateSilo							((JOBOBJECTINFOCLASS)35)
+#define JobObjectSiloBasicInformation				((JOBOBJECTINFOCLASS)36) // SILOOBJECT_BASIC_INFORMATION
+#define JobObjectSiloRootDirectory					((JOBOBJECTINFOCLASS)37) // SILOOBJECT_ROOT_DIRECTORY
+#define JobObjectServerSiloBasicInformation			((JOBOBJECTINFOCLASS)38) // SERVERSILO_BASIC_INFORMATION
+#define JobObjectServerSiloUserSharedData			((JOBOBJECTINFOCLASS)39) // SILO_USER_SHARED_DATA
+#define JobObjectServerSiloInitialize				((JOBOBJECTINFOCLASS)40)
+#define JobObjectServerSiloRunningState				((JOBOBJECTINFOCLASS)41)
+#define JobObjectIoAttribution						((JOBOBJECTINFOCLASS)42)
+#define JobObjectMemoryPartitionInformation			((JOBOBJECTINFOCLASS)43)
+#define JobObjectContainerTelemetryId				((JOBOBJECTINFOCLASS)44)
+#define JobObjectSiloSystemRoot						((JOBOBJECTINFOCLASS)45)
+#define JobObjectEnergyTrackingState				((JOBOBJECTINFOCLASS)46) // JOBOBJECT_ENERGY_TRACKING_STATE
+#define JobObjectThreadImpersonationInformation		((JOBOBJECTINFOCLASS)47)
+#define MaxJobObjectInfoClass						((JOBOBJECTINFOCLASS)48)
+	
 typedef enum _FSINFOCLASS
 {
 	FileFsVolumeInformation			= 1,	// FILE_FS_VOLUME_INFORMATION
@@ -2514,8 +2617,16 @@ typedef enum _SYSDBG_COMMAND
 	SysDbgClearUmBreakPid,
 	SysDbgGetUmAttachPid,
 	SysDbgClearUmAttachPid,
-	SysDbgGetLiveKernelDump
+	SysDbgGetLiveKernelDump,
+	SysDbgKdPullRemoteFile
 } SYSDBG_COMMAND, *PSYSDBG_COMMAND;
+
+typedef enum _SHUTDOWN_ACTION
+{
+	ShutdownNoReboot,
+	ShutdownReboot,
+	ShutdownPowerOff
+} SHUTDOWN_ACTION, *PSHUTDOWN_ACTION;
 
 typedef enum _DEBUGOBJECTINFOCLASS
 {
@@ -2590,13 +2701,18 @@ typedef enum _FILE_INFORMATION_CLASS
 	FileHardLinkFullIdInformation, // FILE_LINK_ENTRY_FULL_ID_INFORMATION
 	FileIdExtdBothDirectoryInformation, // FILE_ID_EXTD_BOTH_DIR_INFORMATION // since THRESHOLD
 	FileDispositionInformationEx, // FILE_DISPOSITION_INFO_EX // since REDSTONE
-	FileRenameInformationEx,
-	FileRenameInformationExBypassAccessCheck,
+	FileRenameInformationEx, // FILE_RENAME_INFORMATION_EX
+	FileRenameInformationExBypassAccessCheck, // (kernel-mode only); FILE_RENAME_INFORMATION_EX
 	FileDesiredStorageClassInformation, // FILE_DESIRED_STORAGE_CLASS_INFORMATION // since REDSTONE2
 	FileStatInformation, // FILE_STAT_INFORMATION
 	FileMemoryPartitionInformation, // FILE_MEMORY_PARTITION_INFORMATION // since REDSTONE3
 	FileMaximumInformation
 } FILE_INFORMATION_CLASS, *PFILE_INFORMATION_CLASS;
+
+typedef enum _DIRECTORY_NOTIFY_INFORMATION_CLASS {
+	DirectoryNotifyInformation			= 1,
+	DirectoryNotifyExtendedInformation	// 2
+} DIRECTORY_NOTIFY_INFORMATION_CLASS, *PDIRECTORY_NOTIFY_INFORMATION_CLASS;
 
 typedef struct _SYSTEM_BASIC_INFORMATION
 {
@@ -2621,6 +2737,36 @@ typedef struct _SYSTEM_PROCESSOR_INFORMATION
 	USHORT MaximumProcessors;
 	ULONG ProcessorFeatureBits;
 } SYSTEM_PROCESSOR_INFORMATION, *PSYSTEM_PROCESSOR_INFORMATION;
+
+// Named pipe FS control definitions
+#define DEVICE_NAMED_PIPE L"\\Device\\NamedPipe\\"
+
+#define FSCTL_PIPE_ASSIGN_EVENT				CTL_CODE(FILE_DEVICE_NAMED_PIPE, 0, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_DISCONNECT				CTL_CODE(FILE_DEVICE_NAMED_PIPE, 1, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_LISTEN					CTL_CODE(FILE_DEVICE_NAMED_PIPE, 2, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_PEEK						CTL_CODE(FILE_DEVICE_NAMED_PIPE, 3, METHOD_BUFFERED, FILE_READ_DATA)
+#define FSCTL_PIPE_QUERY_EVENT				CTL_CODE(FILE_DEVICE_NAMED_PIPE, 4, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_TRANSCEIVE				CTL_CODE(FILE_DEVICE_NAMED_PIPE, 5, METHOD_NEITHER, FILE_READ_DATA | FILE_WRITE_DATA)
+#define FSCTL_PIPE_WAIT						CTL_CODE(FILE_DEVICE_NAMED_PIPE, 6, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_IMPERSONATE				CTL_CODE(FILE_DEVICE_NAMED_PIPE, 7, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_SET_CLIENT_PROCESS		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 8, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_QUERY_CLIENT_PROCESS		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 9, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_GET_PIPE_ATTRIBUTE		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 10, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_SET_PIPE_ATTRIBUTE		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 11, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_GET_CONNECTION_ATTRIBUTE CTL_CODE(FILE_DEVICE_NAMED_PIPE, 12, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_SET_CONNECTION_ATTRIBUTE	CTL_CODE(FILE_DEVICE_NAMED_PIPE, 13, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_GET_HANDLE_ATTRIBUTE		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 14, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_SET_HANDLE_ATTRIBUTE		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 15, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define FSCTL_PIPE_FLUSH					CTL_CODE(FILE_DEVICE_NAMED_PIPE, 16, METHOD_BUFFERED, FILE_WRITE_DATA)
+
+#define FSCTL_PIPE_INTERNAL_READ			CTL_CODE(FILE_DEVICE_NAMED_PIPE, 2045, METHOD_BUFFERED, FILE_READ_DATA)
+#define FSCTL_PIPE_INTERNAL_WRITE			CTL_CODE(FILE_DEVICE_NAMED_PIPE, 2046, METHOD_BUFFERED, FILE_WRITE_DATA)
+#define FSCTL_PIPE_INTERNAL_TRANSCEIVE		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 2047, METHOD_NEITHER, FILE_READ_DATA | FILE_WRITE_DATA)
+#define FSCTL_PIPE_INTERNAL_READ_OVFLOW		CTL_CODE(FILE_DEVICE_NAMED_PIPE, 2048, METHOD_BUFFERED, FILE_READ_DATA)
+
+// Flags for query event
+#define FILE_PIPE_READ_DATA					0x00000000
+#define FILE_PIPE_WRITE_SPACE				0x00000001
 
 typedef struct _FILE_PIPE_PEEK_BUFFER
 {
@@ -2664,6 +2810,12 @@ typedef struct _SYSTEM_TIMEOFDAY_INFORMATION
 	ULONGLONG BootTimeBias;
 	ULONGLONG SleepTimeBias;
 } SYSTEM_TIMEOFDAY_INFORMATION, *PSYSTEM_TIMEOFDAY_INFORMATION;
+
+typedef struct _FILE_FS_DEVICE_INFORMATION
+{
+	ULONG DeviceType;
+	ULONG Characteristics;
+} FILE_FS_DEVICE_INFORMATION, *PFILE_FS_DEVICE_INFORMATION;
 
 typedef struct _TIME_FIELDS
 {
@@ -2751,7 +2903,7 @@ typedef struct _PS_PROTECTION
 			PS_PROTECTED_SIGNER Signer : 4;
 		} s;
 		UCHAR Level;
-	};
+	} u;
 } PS_PROTECTION, *PPS_PROTECTION;
 
 #define RTL_CREATE_ENVIRONMENT_TRANSLATE			0x1 // Translate from multi-byte to Unicode
@@ -2832,8 +2984,8 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS
 typedef struct _RTL_USER_PROCESS_INFORMATION
 {
 	ULONG Length;
-	HANDLE Process;
-	HANDLE Thread;
+	HANDLE ProcessHandle;
+	HANDLE ThreadHandle;
 	CLIENT_ID ClientId;
 	SECTION_IMAGE_INFORMATION ImageInformation;
 } RTL_USER_PROCESS_INFORMATION, *PRTL_USER_PROCESS_INFORMATION;
@@ -3517,6 +3669,31 @@ typedef struct _SYSTEM_EXTENDED_THREAD_INFORMATION
 	ULONG_PTR Reserved4;
 } SYSTEM_EXTENDED_THREAD_INFORMATION, *PSYSTEM_EXTENDED_THREAD_INFORMATION;
 
+typedef struct _JOBOBJECT_WAKE_FILTER
+{
+	ULONG HighEdgeFilter;
+	ULONG LowEdgeFilter;
+} JOBOBJECT_WAKE_FILTER, *PJOBOBJECT_WAKE_FILTER;
+
+typedef struct _JOBOBJECT_FREEZE_INFORMATION
+{
+	union
+	{
+		ULONG Flags;
+		struct
+		{
+			ULONG FreezeOperation : 1;
+			ULONG FilterOperation : 1;
+			ULONG SwapOperation : 1;
+			ULONG Reserved : 29;
+		} s;
+	} u;
+	BOOLEAN Freeze;
+	BOOLEAN Swap;
+	UCHAR Reserved0[2];
+	JOBOBJECT_WAKE_FILTER WakeFilter;
+} JOBOBJECT_FREEZE_INFORMATION, *PJOBOBJECT_FREEZE_INFORMATION;
+
 #define PTR_ADD_OFFSET(Pointer, Offset) ((PVOID)((ULONG_PTR)(Pointer) + (ULONG_PTR)(Offset)))
 #define PTR_SUB_OFFSET(Pointer, Offset) ((PVOID)((ULONG_PTR)(Pointer) - (ULONG_PTR)(Offset)))
 #define ALIGN_DOWN_BY(Address, Align) ((ULONG_PTR)(Address) & ~((Align) - 1))
@@ -3535,14 +3712,13 @@ typedef struct _SYSTEM_EXTENDED_THREAD_INFORMATION
 	(p)->SecurityQualityOfService = NULL;				\
 	}
 
-#if defined(__cplusplus)
-#define RTL_CONST_CAST(type) const_cast<type>
-#else
-#define RTL_CONST_CAST(type) (type)
-#endif
-
+#if !defined(__cplusplus)
 #define RTL_CONSTANT_OBJECT_ATTRIBUTES(n, a) \
-	{ sizeof(OBJECT_ATTRIBUTES), NULL, RTL_CONST_CAST(PUNICODE_STRING)(n), a, NULL, NULL }
+	{ sizeof(OBJECT_ATTRIBUTES), NULL, ((PUNICODE_STRING)(n)), (a), NULL, NULL }
+#else
+#define RTL_CONSTANT_OBJECT_ATTRIBUTES(n, a) \
+	{ sizeof(OBJECT_ATTRIBUTES), nullptr, ((remove_constref<PUNICODE_STRING>::type)(n)), (a), nullptr, nullptr }
+#endif
 
 #define OBJ_INHERIT									0x00000002L
 #define OBJ_PERMANENT								0x00000010L
@@ -3569,6 +3745,7 @@ typedef struct _SYSTEM_EXTENDED_THREAD_INFORMATION
 #define THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER		0x00000004
 #define THREAD_CREATE_FLAGS_HAS_SECURITY_DESCRIPTOR	0x00000010 // ?
 #define THREAD_CREATE_FLAGS_ACCESS_CHECK_IN_TARGET	0x00000020 // ?
+#define THREAD_CREATE_FLAGS_BYPASS_PROCESS_FREEZE	0x00000040 // 19H1+
 #define THREAD_CREATE_FLAGS_INITIAL_THREAD			0x00000080
 
 #define DEBUG_READ_EVENT							0x0001
@@ -3685,7 +3862,34 @@ typedef struct _WORKER_FACTORY_DEFERRED_WORK
 
 #define NtCurrentProcess		((HANDLE)(LONG_PTR)-1)
 #define NtCurrentThread			((HANDLE)(LONG_PTR)-2)
-#define NtCurrentPeb()			(NtCurrentTeb()->ProcessEnvironmentBlock)
+
+FORCEINLINE
+PPEB
+NtCurrentPeb(
+	VOID
+	)
+{
+#if defined(_M_AMD64)
+	return (PPEB)__readgsqword(FIELD_OFFSET(TEB, ProcessEnvironmentBlock));
+#elif defined(_M_IX86)
+	return (PPEB)__readfsdword(FIELD_OFFSET(TEB, ProcessEnvironmentBlock));
+#elif defined(_M_ARM)
+	return (PPEB)(((PTEB)(ULONG_PTR)_MoveFromCoprocessor(CP15_TPIDRURW))->ProcessEnvironmentBlock);
+#elif defined(_M_ARM64)
+	return (PPEB)(((PTEB)__getReg(18))->ProcessEnvironmentBlock);
+#elif defined(_M_IA64)
+	return *(PPEB*)((size_t)_rdteb() + FIELD_OFFSET(TEB, ProcessEnvironmentBlock));
+#elif defined(_M_ALPHA)
+	return *(PPEB*)((size_t)_rdteb() + FIELD_OFFSET(TEB, ProcessEnvironmentBlock));
+#elif defined(_M_MIPS)
+	return *(PPEB*)((*(size_t*)(0x7ffff030)) + FIELD_OFFSET(TEB, ProcessEnvironmentBlock));
+#elif defined(_M_PPC)
+	return *(PPEB*)(__gregister_get(13) + FIELD_OFFSET(TEB, ProcessEnvironmentBlock));
+#else
+	#error "Unsupported architecture"
+#endif
+}
+
 #define NtCurrentProcessId()	(NtCurrentTeb()->ClientId.UniqueProcess)
 #define NtCurrentThreadId()		(NtCurrentTeb()->ClientId.UniqueThread)
 #define RtlProcessHeap()		(NtCurrentPeb()->ProcessHeap)
@@ -3826,18 +4030,19 @@ typedef struct _RTL_HEAP_WALK_ENTRY
 			PVOID FirstEntry;
 			PVOID LastEntry;
 		} Segment;
-	};
+	} u;
 } RTL_HEAP_WALK_ENTRY, *PRTL_HEAP_WALK_ENTRY;
 
 // HEAP_INFORMATION_CLASS. winnt.h is incomplete
-#define HeapCompatibilityInformation 0x0 // q; s: ULONG
-#define HeapEnableTerminationOnCorruption 0x1 // q; s: NULL
-#define HeapExtendedInformation 0x2 // q; s: HEAP_EXTENDED_INFORMATION
-#define HeapOptimizeResources 0x3 // q; s: HEAP_OPTIMIZE_RESOURCES_INFORMATION
-#define HeapTaggingInformation 0x4
-#define HeapStackDatabase 0x5
-#define HeapDetailedFailureInformation 0x80000001
-#define HeapSetDebuggingInformation 0x80000002 // q; s: HEAP_DEBUGGING_INFORMATION
+#define HeapCompatibilityInformation		((HEAP_INFORMATION_CLASS)0x0) // q; s: ULONG
+#define HeapEnableTerminationOnCorruption	((HEAP_INFORMATION_CLASS)0x1) // q; s: NULL
+#define HeapExtendedInformation				((HEAP_INFORMATION_CLASS)0x2) // q; s: HEAP_EXTENDED_INFORMATION
+#define HeapOptimizeResources				((HEAP_INFORMATION_CLASS)0x3) // q; s: HEAP_OPTIMIZE_RESOURCES_INFORMATION
+#define HeapTaggingInformation				((HEAP_INFORMATION_CLASS)0x4)
+#define HeapStackDatabase					((HEAP_INFORMATION_CLASS)0x5)
+#define HeapMemoryLimit						((HEAP_INFORMATION_CLASS)0x6) // 19H2
+#define HeapDetailedFailureInformation		((HEAP_INFORMATION_CLASS)0x80000001)
+#define HeapSetDebuggingInformation			((HEAP_INFORMATION_CLASS)0x80000002) // q; s: HEAP_DEBUGGING_INFORMATION
 
 typedef struct _PROCESS_HEAP_INFORMATION
 {
@@ -3908,6 +4113,7 @@ PUSER_THREAD_START_ROUTINE)(
 
 #define LDR_FORMAT_MESSAGE_FROM_SYSTEM_MESSAGE_TABLE	11
 
+#define RTL_ERRORMODE_FAILCRITICALERRORS				0x0010
 #define RTL_ERRORMODE_NOGPFAULTERRORBOX					0x0020
 #define RTL_ERRORMODE_NOOPENFILEERRORBOX				0x0040
 
@@ -4115,14 +4321,14 @@ typedef struct _IO_COMPLETION_BASIC_INFORMATION
 
 typedef enum _WORKERFACTORYINFOCLASS
 {
-	WorkerFactoryTimeout,
-	WorkerFactoryRetryTimeout,
-	WorkerFactoryIdleTimeout,
+	WorkerFactoryTimeout, // q; s: LARGE_INTEGER
+	WorkerFactoryRetryTimeout, // q; s: LARGE_INTEGER
+	WorkerFactoryIdleTimeout, // q; s: LARGE_INTEGER
 	WorkerFactoryBindingCount,
-	WorkerFactoryThreadMinimum,
-	WorkerFactoryThreadMaximum,
-	WorkerFactoryPaused,
-	WorkerFactoryBasicInformation,
+	WorkerFactoryThreadMinimum, // q; s: ULONG
+	WorkerFactoryThreadMaximum, // q; s: ULONG
+	WorkerFactoryPaused, // ULONG or BOOLEAN
+	WorkerFactoryBasicInformation, // WORKER_FACTORY_BASIC_INFORMATION
 	WorkerFactoryAdjustThreadGoal,
 	WorkerFactoryCallbackType,
 	WorkerFactoryStackInformation, // 10
@@ -4130,6 +4336,7 @@ typedef enum _WORKERFACTORYINFOCLASS
 	WorkerFactoryTimeoutWaiters, // since THRESHOLD
 	WorkerFactoryFlags,
 	WorkerFactoryThreadSoftMaximum,
+	WorkerFactoryThreadCpuSets, // since REDSTONE5
 	MaxWorkerFactoryInfoClass
 } WORKERFACTORYINFOCLASS, *PWORKERFACTORYINFOCLASS;
 
@@ -4413,7 +4620,7 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtQueryObject(
-	_In_ HANDLE Handle,
+	_In_opt_ HANDLE Handle,
 	_In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
 	_Out_opt_ PVOID ObjectInformation,
 	_In_ ULONG ObjectInformationLength,
@@ -4721,7 +4928,7 @@ NTSTATUS
 NTAPI
 NtQueryVirtualMemory(
 	_In_ HANDLE ProcessHandle,
-	_In_ PVOID BaseAddress,
+	_In_opt_ PVOID BaseAddress,
 	_In_ MEMORY_INFORMATION_CLASS MemoryInformationClass,
 	_Out_ PVOID MemoryInformation,
 	_In_ SIZE_T MemoryInformationLength,
@@ -4763,6 +4970,29 @@ NtSystemDebugControl(
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
+NtShutdownSystem(
+	_In_ SHUTDOWN_ACTION Action
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtDisplayString(
+	_In_ PUNICODE_STRING String
+	);
+
+#if NTDDI_VERSION >= NTDDI_WIN7
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtDrawText(
+	_In_ PUNICODE_STRING Text
+	);
+#endif
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
 NtYieldExecution(
 	);
 
@@ -4770,7 +5000,7 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtClose(
-	_In_ HANDLE Handle
+	_In_ _Post_ptr_invalid_ HANDLE Handle
 	);
 
 NTSYSCALLAPI
@@ -4789,6 +5019,19 @@ NtQueryFullAttributesFile(
 	_Out_ PFILE_NETWORK_OPEN_INFORMATION FileInformation
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN10_RS2
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtQueryInformationByName(
+	_In_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_Out_ PIO_STATUS_BLOCK IoStatusBlock,
+	_Out_writes_bytes_(Length) PVOID FileInformation,
+	_In_ ULONG Length,
+	_In_ FILE_INFORMATION_CLASS FileInformationClass
+	);
+#endif
+	
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -4978,7 +5221,7 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtGetNextProcess(
-	_In_ HANDLE ProcessHandle,
+	_In_opt_ HANDLE ProcessHandle,
 	_In_ ACCESS_MASK DesiredAccess,
 	_In_ ULONG HandleAttributes,
 	_In_ ULONG Flags,
@@ -4990,7 +5233,7 @@ NTSTATUS
 NTAPI
 NtGetNextThread(
 	_In_ HANDLE ProcessHandle,
-	_In_ HANDLE ThreadHandle,
+	_In_opt_ HANDLE ThreadHandle,
 	_In_ ACCESS_MASK DesiredAccess,
 	_In_ ULONG HandleAttributes,
 	_In_ ULONG Flags,
@@ -5066,6 +5309,78 @@ NtCreateThreadEx(
 	);
 #endif
 
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtCreateJobObject(
+	_Out_ PHANDLE JobHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtOpenJobObject(
+	_Out_ PHANDLE JobHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_ POBJECT_ATTRIBUTES ObjectAttributes
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtAssignProcessToJobObject(
+	_In_ HANDLE JobHandle,
+	_In_ HANDLE ProcessHandle
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtTerminateJobObject(
+	_In_ HANDLE JobHandle,
+	_In_ NTSTATUS ExitStatus
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtIsProcessInJob(
+	_In_ HANDLE ProcessHandle,
+	_In_opt_ HANDLE JobHandle
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtQueryInformationJobObject(
+	_In_opt_ HANDLE JobHandle,
+	_In_ JOBOBJECTINFOCLASS JobObjectInformationClass,
+	_Out_writes_bytes_(JobObjectInformationLength) PVOID JobObjectInformation,
+	_In_ ULONG JobObjectInformationLength,
+	_Out_opt_ PULONG ReturnLength
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtSetInformationJobObject(
+	_In_ HANDLE JobHandle,
+	_In_ JOBOBJECTINFOCLASS JobObjectInformationClass,
+	_In_reads_bytes_(JobObjectInformationLength) PVOID JobObjectInformation,
+	_In_ ULONG JobObjectInformationLength
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtCreateJobSet(
+	_In_ ULONG NumJob,
+	_In_reads_(NumJob) PJOB_SET_ARRAY UserJobSet,
+	_In_ ULONG Flags
+	);
+	
 #if NTDDI_VERSION >= NTDDI_WIN7
 NTSYSCALLAPI
 NTSTATUS
@@ -5297,6 +5612,24 @@ NtNotifyChangeDirectoryFile(
 	_In_ BOOLEAN WatchTree
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN10_RS3
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtNotifyChangeDirectoryFileEx(
+	_In_ HANDLE FileHandle,
+	_In_opt_ HANDLE Event,
+	_In_opt_ PIO_APC_ROUTINE ApcRoutine,
+	_In_opt_ PVOID ApcContext,
+	_Out_ PIO_STATUS_BLOCK IoStatusBlock,
+	_Out_writes_bytes_(Length) PVOID Buffer,
+	_In_ ULONG Length,
+	_In_ ULONG CompletionFilter,
+	_In_ BOOLEAN WatchTree,
+	_In_opt_ DIRECTORY_NOTIFY_INFORMATION_CLASS DirectoryNotifyInformationClass
+	);
+#endif
+	
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -5326,6 +5659,37 @@ NtQueryDirectoryFile(
 	_In_ BOOLEAN RestartScan
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN10_RS3
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtQueryDirectoryFileEx(
+	_In_ HANDLE FileHandle,
+	_In_opt_ HANDLE Event,
+	_In_opt_ PIO_APC_ROUTINE ApcRoutine,
+	_In_opt_ PVOID ApcContext,
+	_Out_ PIO_STATUS_BLOCK IoStatusBlock,
+	_Out_writes_bytes_(Length) PVOID FileInformation,
+	_In_ ULONG Length,
+	_In_ FILE_INFORMATION_CLASS FileInformationClass,
+	_In_ ULONG QueryFlags,
+	_In_opt_ PUNICODE_STRING FileName
+	);
+#endif
+
+#if (NTDDI_VERSION >= NTDDI_WIN10_RS2)
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtQueryInformationByName(
+	_In_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_Out_ PIO_STATUS_BLOCK IoStatusBlock,
+	_Out_writes_bytes_(Length) PVOID FileInformation,
+	_In_ ULONG Length,
+	_In_ FILE_INFORMATION_CLASS FileInformationClass
+	);
+#endif
+	
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
@@ -5524,7 +5888,7 @@ NtCreatePrivateNamespace(
 	_Out_ PHANDLE NamespaceHandle,
 	_In_ ACCESS_MASK DesiredAccess,
 	_In_ POBJECT_ATTRIBUTES ObjectAttributes,
-	_In_ PVOID BoundaryDescriptor
+	_In_ HANDLE BoundaryDescriptor
 	);
 
 NTSYSCALLAPI
@@ -5534,7 +5898,7 @@ NtOpenPrivateNamespace(
 	_Out_ PHANDLE NamespaceHandle,
 	_In_ ACCESS_MASK DesiredAccess,
 	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
-	_In_ PVOID BoundaryDescriptor
+	_In_ HANDLE BoundaryDescriptor
 	);
 
 NTSYSCALLAPI
@@ -6047,7 +6411,7 @@ NTAPI
 NtQueryOpenSubKeysEx(
 	_In_ POBJECT_ATTRIBUTES TargetKey,
 	_In_ ULONG BufferLength,
-	_Out_writes_bytes_(BufferLength) PVOID Buffer,
+	_Out_writes_bytes_opt_(BufferLength) PVOID Buffer,
 	_Out_ PULONG RequiredSize
 	);
 #endif
@@ -6094,7 +6458,7 @@ NTSTATUS
 NTAPI
 NtDelayExecution(
 	_In_ BOOLEAN Alertable,
-	_In_ PLARGE_INTEGER DelayInterval
+	_In_opt_ PLARGE_INTEGER DelayInterval
 	);
 
 NTSYSCALLAPI
@@ -6243,6 +6607,17 @@ NtDuplicateToken(
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
+NtQueryInformationToken(
+	_In_ HANDLE TokenHandle,
+	_In_ TOKEN_INFORMATION_CLASS TokenInformationClass,
+	_Out_writes_bytes_to_opt_(TokenInformationLength, *ReturnLength) PVOID TokenInformation,
+	_In_ ULONG TokenInformationLength,
+	_Out_ PULONG ReturnLength
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
 NtAdjustPrivilegesToken(
 	_In_ HANDLE TokenHandle,
 	_In_ BOOLEAN DisableAllPrivileges,
@@ -6259,8 +6634,8 @@ NtAdjustGroupsToken(
 	_In_ HANDLE TokenHandle,
 	_In_ BOOLEAN ResetToDefault,
 	_In_opt_ PTOKEN_GROUPS NewState,
-	_In_opt_ ULONG BufferLength,
-	_Out_ PTOKEN_GROUPS PreviousState,
+	_In_range_(>= , sizeof(TOKEN_GROUPS)) ULONG BufferLength,
+	_Out_writes_bytes_to_opt_(BufferLength, *ReturnLength) PTOKEN_GROUPS PreviousState,
 	_Out_ PULONG ReturnLength
 	);
 
@@ -6453,6 +6828,39 @@ NtRemoveIoCompletionEx(
 	);
 #endif
 
+#if NTDDI_VERSION >= NTDDI_WIN8
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtCreateWaitCompletionPacket(
+	_Out_ PHANDLE WaitCompletionPacketHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtAssociateWaitCompletionPacket(
+	_In_ HANDLE WaitCompletionPacketHandle,
+	_In_ HANDLE IoCompletionHandle,
+	_In_ HANDLE TargetObjectHandle,
+	_In_opt_ PVOID KeyContext,
+	_In_opt_ PVOID ApcContext,
+	_In_ NTSTATUS IoStatus,
+	_In_ ULONG_PTR IoStatusInformation,
+	_Out_opt_ PBOOLEAN AlreadySignaled
+	);
+
+NTSYSCALLAPI
+NTSTATUS
+NTAPI
+NtCancelWaitCompletionPacket(
+	_In_ HANDLE WaitCompletionPacketHandle,
+	_In_ BOOLEAN RemoveSignaledPacket
+	);
+#endif
+	
 #if NTDDI_VERSION >= NTDDI_WIN7
 NTSYSCALLAPI
 NTSTATUS
@@ -7861,6 +8269,117 @@ RtlDecompressBuffer(
 	_Out_ PULONG FinalUncompressedSize
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN8
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDecompressBufferEx(
+	_In_ USHORT CompressionFormat,
+	_Out_writes_bytes_to_(UncompressedBufferSize, *FinalUncompressedSize) PUCHAR UncompressedBuffer,
+	_In_ ULONG UncompressedBufferSize,
+	_In_reads_bytes_(CompressedBufferSize) PUCHAR CompressedBuffer,
+	_In_ ULONG CompressedBufferSize,
+	_Out_ PULONG FinalUncompressedSize,
+	_In_opt_ PVOID WorkSpace
+	);
+#endif
+
+#if NTDDI_VERSION >= NTDDI_WINBLUE
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDecompressBufferEx2(
+	_In_ USHORT CompressionFormat,
+	_Out_writes_bytes_to_(UncompressedBufferSize, *FinalUncompressedSize) PUCHAR UncompressedBuffer,
+	_In_ ULONG UncompressedBufferSize,
+	_In_reads_bytes_(CompressedBufferSize) PUCHAR CompressedBuffer,
+	_In_ ULONG CompressedBufferSize,
+	_In_ ULONG UncompressedChunkSize,
+	_Out_ PULONG FinalUncompressedSize,
+	_In_opt_ PVOID WorkSpace
+	);
+#endif
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDecompressFragment(
+	_In_ USHORT CompressionFormat,
+	_Out_writes_bytes_to_(UncompressedFragmentSize, *FinalUncompressedSize) PUCHAR UncompressedFragment,
+	_In_ ULONG UncompressedFragmentSize,
+	_In_reads_bytes_(CompressedBufferSize) PUCHAR CompressedBuffer,
+	_In_ ULONG CompressedBufferSize,
+	_In_range_(<, CompressedBufferSize) ULONG FragmentOffset,
+	_Out_ PULONG FinalUncompressedSize,
+	_In_ PVOID WorkSpace
+	);
+
+#if NTDDI_VERSION >= NTDDI_WINBLUE
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDecompressFragmentEx(
+	_In_ USHORT CompressionFormat,
+	_Out_writes_bytes_to_(UncompressedFragmentSize, *FinalUncompressedSize) PUCHAR UncompressedFragment,
+	_In_ ULONG UncompressedFragmentSize,
+	_In_reads_bytes_(CompressedBufferSize) PUCHAR CompressedBuffer,
+	_In_ ULONG CompressedBufferSize,
+	_In_range_(<, CompressedBufferSize) ULONG FragmentOffset,
+	_In_ ULONG UncompressedChunkSize,
+	_Out_ PULONG FinalUncompressedSize,
+	_In_ PVOID WorkSpace
+	);
+#endif
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDescribeChunk(
+	_In_ USHORT CompressionFormat,
+	_Inout_ PUCHAR *CompressedBuffer,
+	_In_ PUCHAR EndOfCompressedBufferPlus1,
+	_Out_ PUCHAR *ChunkBuffer,
+	_Out_ PULONG ChunkSize
+	);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlReserveChunk(
+	_In_ USHORT CompressionFormat,
+	_Inout_ PUCHAR *CompressedBuffer,
+	_In_ PUCHAR EndOfCompressedBufferPlus1,
+	_Out_ PUCHAR *ChunkBuffer,
+	_In_ ULONG ChunkSize
+	);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDecompressChunks(
+	_Out_writes_bytes_(UncompressedBufferSize) PUCHAR UncompressedBuffer,
+	_In_ ULONG UncompressedBufferSize,
+	_In_reads_bytes_(CompressedBufferSize) PUCHAR CompressedBuffer,
+	_In_ ULONG CompressedBufferSize,
+	_In_reads_bytes_(CompressedTailSize) PUCHAR CompressedTail,
+	_In_ ULONG CompressedTailSize,
+	_In_ PCOMPRESSED_DATA_INFO CompressedDataInfo
+	);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlCompressChunks(
+	_In_reads_bytes_(UncompressedBufferSize) PUCHAR UncompressedBuffer,
+	_In_ ULONG UncompressedBufferSize,
+	_Out_writes_bytes_(CompressedBufferSize) PUCHAR CompressedBuffer,
+	_In_range_(>=, (UncompressedBufferSize - (UncompressedBufferSize / 16))) ULONG CompressedBufferSize,
+	_Inout_updates_bytes_(CompressedDataInfoLength) PCOMPRESSED_DATA_INFO CompressedDataInfo,
+	_In_range_(>, sizeof(COMPRESSED_DATA_INFO)) ULONG CompressedDataInfoLength,
+	_In_ PVOID WorkSpace
+	);
+
+_Must_inspect_result_
 NTSYSAPI
 PVOID
 NTAPI
@@ -7877,9 +8396,12 @@ NTSYSAPI
 PVOID
 NTAPI
 RtlDestroyHeap(
-	_Inout_ PVOID HeapHandle
+	_In_ _Post_invalid_ PVOID HeapHandle
 	);
 
+_Must_inspect_result_
+_Ret_maybenull_
+_Post_writable_byte_size_(Size)
 NTSYSAPI
 PVOID
 NTAPI
@@ -8083,6 +8605,7 @@ RtlUniform(
 	_Inout_ PULONG Seed
 	);
 
+_Ret_range_(<=, MAXLONG)
 NTSYSAPI
 ULONG
 NTAPI
@@ -8090,6 +8613,7 @@ RtlRandom(
 	_Inout_ PULONG Seed
 	);
 
+_Ret_range_(<=, MAXLONG)
 NTSYSAPI
 ULONG
 NTAPI
@@ -8186,6 +8710,16 @@ RtlSetThreadErrorMode(
 	);
 #endif
 
+_Success_(return != 0)
+_Must_inspect_result_
+NTSYSAPI
+BOOLEAN
+NTAPI
+RtlCreateUnicodeString(
+	_Out_ PUNICODE_STRING DestinationString,
+	_In_z_ PCWSTR SourceString
+	);
+	
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -8200,7 +8734,15 @@ VOID
 NTAPI
 RtlInitUnicodeString(
 	_Out_ PUNICODE_STRING DestinationString,
-	_In_opt_ PWSTR SourceString
+	_In_opt_z_ PCWSTR SourceString
+	);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlInitUnicodeStringEx(
+	_Out_ PUNICODE_STRING DestinationString,
+	_In_opt_z_ PCWSTR SourceString
 	);
 
 NTSYSAPI
@@ -8266,7 +8808,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 RtlAppendStringToString(
-	_In_ PSTRING Destination,
+	_Inout_ PSTRING Destination,
 	_In_ PSTRING Source
 	);
 
@@ -8378,7 +8920,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 RtlSetEnvironmentVar(
-	_In_opt_ PWSTR *Environment,
+	_Inout_opt_ PVOID *Environment,
 	_In_ PWSTR Name,
 	_In_ SIZE_T NameLength,
 	_In_ PWSTR Value,
@@ -8390,7 +8932,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 RtlSetEnvironmentVariable(
-	_In_opt_ PVOID *Environment,
+	_Inout_opt_ PVOID *Environment,
 	_In_ PUNICODE_STRING Name,
 	_In_ PUNICODE_STRING Value
 	);
@@ -8415,7 +8957,7 @@ NTAPI
 RtlQueryEnvironmentVariable_U(
 	_In_opt_ PVOID Environment,
 	_In_ PUNICODE_STRING Name,
-	_Out_ PUNICODE_STRING Value
+	_Inout_ PUNICODE_STRING Value
 	);
 
 #if NTDDI_VERSION >= NTDDI_VISTA
@@ -8438,7 +8980,7 @@ NTAPI
 RtlExpandEnvironmentStrings_U(
 	_In_opt_ PVOID Environment,
 	_In_ PUNICODE_STRING Source,
-	_Out_ PUNICODE_STRING Destination,
+	_Inout_ PUNICODE_STRING Destination,
 	_Out_opt_ PULONG ReturnedLength
 	);
 
@@ -9103,6 +9645,7 @@ RtlCopyLuid(
 	_In_ PLUID SourceLuid
 	);
 
+_Must_inspect_result_
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -9120,13 +9663,36 @@ RtlAllocateAndInitializeSid(
 	_Outptr_ PSID *Sid
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN8
+_Must_inspect_result_
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlAllocateAndInitializeSidEx(
+	_In_ PSID_IDENTIFIER_AUTHORITY IdentifierAuthority,
+	_In_ UCHAR SubAuthorityCount,
+	_In_reads_(SubAuthorityCount) PULONG SubAuthorities,
+	_Outptr_ PSID *Sid
+	);
+	
+#endif
+	
 NTSYSAPI
 NTSTATUS
 NTAPI
 RtlCopySid(
 	_In_ ULONG DestinationSidLength,
-	_Out_ PSID DestinationSid,
+	_Out_writes_bytes_(DestinationSidLength) PSID DestinationSid,
 	_In_ PSID SourceSid
+	);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlCreateServiceSid(
+	_In_ PUNICODE_STRING ServiceName,
+	_Out_writes_bytes_opt_(*ServiceSidLength) PSID ServiceSid,
+	_Inout_ PULONG ServiceSidLength
 	);
 
 NTSYSAPI
@@ -9224,6 +9790,7 @@ RtlEmptyAtomTable(
 	_In_ BOOLEAN IncludePinnedAtoms
 	);
 
+_Must_inspect_result_
 NTSYSAPI
 BOOLEAN
 NTAPI
@@ -9350,7 +9917,7 @@ NTAPI
 RtlGetDaclSecurityDescriptor(
 	_In_ PSECURITY_DESCRIPTOR SecurityDescriptor,
 	_Out_ PBOOLEAN DaclPresent,
-	_Out_ PACL *Dacl,
+	_Outptr_result_maybenull_ PACL *Dacl,
 	_Out_ PBOOLEAN DaclDefaulted
 	);
 
@@ -9359,7 +9926,7 @@ NTSTATUS
 NTAPI
 RtlGetGroupSecurityDescriptor(
 	_In_ PSECURITY_DESCRIPTOR SecurityDescriptor,
-	_Out_ PSID *Group,
+	_Outptr_result_maybenull_ PSID *Group,
 	_Out_ PBOOLEAN GroupDefaulted
 	);
 
@@ -9368,7 +9935,7 @@ NTSTATUS
 NTAPI
 RtlGetOwnerSecurityDescriptor(
 	_In_ PSECURITY_DESCRIPTOR SecurityDescriptor,
-	_Out_ PSID *Owner,
+	_Outptr_result_maybenull_ PSID *Owner,
 	_Out_ PBOOLEAN OwnerDefaulted
 	);
 
@@ -9611,7 +10178,7 @@ NTAPI
 RtlSetGroupSecurityDescriptor(
 	_Inout_ PSECURITY_DESCRIPTOR SecurityDescriptor,
 	_In_opt_ PSID Group,
-	_In_opt_ BOOLEAN GroupDefaulted
+	_In_ BOOLEAN GroupDefaulted
 	);
 
 NTSYSAPI
@@ -9718,6 +10285,7 @@ RtlValidSecurityDescriptor(
 	_In_ PSECURITY_DESCRIPTOR SecurityDescriptor
 	);
 
+_Must_inspect_result_
 NTSYSAPI
 BOOLEAN
 NTAPI
@@ -9744,6 +10312,7 @@ VerSetConditionMask(
 	);
 
 #if NTDDI_VERSION >= NTDDI_VISTA
+_Check_return_
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -9773,7 +10342,7 @@ VOID
 NTAPI
 TpSetPoolMaxThreads(
 	_Inout_ PTP_POOL Pool,
-	_In_ LONG MaxThreads
+	_In_ ULONG MaxThreads
 	);
 
 NTSYSAPI
@@ -9781,7 +10350,7 @@ NTSTATUS
 NTAPI
 TpSetPoolMinThreads(
 	_Inout_ PTP_POOL Pool,
-	_In_ LONG MinThreads
+	_In_ ULONG MinThreads
 	);
 
 #if NTDDI_VERSION >= NTDDI_WIN7
@@ -9802,6 +10371,7 @@ TpSetPoolStackInformation(
 	);
 #endif
 
+_Check_return_
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -9826,6 +10396,62 @@ TpReleaseCleanupGroupMembers(
 	);
 
 NTSYSAPI
+VOID
+NTAPI
+TpCallbackSetEventOnCompletion(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance,
+	_In_ HANDLE Event
+	);
+
+NTSYSAPI
+VOID
+NTAPI
+TpCallbackReleaseSemaphoreOnCompletion(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance,
+	_In_ HANDLE Semaphore,
+	_In_ ULONG ReleaseCount
+	);
+
+NTSYSAPI
+VOID
+NTAPI
+TpCallbackReleaseMutexOnCompletion(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance,
+	_In_ HANDLE Mutex
+	);
+
+NTSYSAPI
+VOID
+NTAPI
+TpCallbackLeaveCriticalSectionOnCompletion(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance,
+	_Inout_ PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+NTSYSAPI
+VOID
+NTAPI
+TpCallbackUnloadDllOnCompletion(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance,
+	_In_ PVOID DllHandle
+	);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+TpCallbackMayRunLong(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance
+	);
+
+NTSYSAPI
+VOID
+NTAPI
+TpDisassociateCallback(
+	_Inout_ PTP_CALLBACK_INSTANCE Instance
+	);
+
+_Check_return_
+NTSYSAPI
 NTSTATUS
 NTAPI
 TpSimpleTryPost(
@@ -9834,6 +10460,7 @@ TpSimpleTryPost(
 	_In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron
 	);
 
+_Check_return_
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -9866,6 +10493,7 @@ TpWaitForWork(
 	_In_ LOGICAL CancelPendingCallbacks
 	);
 
+_Check_return_
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -9889,9 +10517,21 @@ NTAPI
 TpSetTimer(
 	_Inout_ PTP_TIMER Timer,
 	_In_opt_ PLARGE_INTEGER DueTime,
-	_In_ LONG Period,
-	_In_opt_ LONG WindowLength
+	_In_ ULONG Period,
+	_In_opt_ ULONG WindowLength
 	);
+
+#if NTDDI_VERSION >= NTDDI_WIN7
+NTSYSAPI
+NTSTATUS
+NTAPI
+TpSetTimerEx(
+	_Inout_ PTP_TIMER Timer,
+	_In_opt_ PLARGE_INTEGER DueTime,
+	_In_ ULONG Period,
+	_In_opt_ ULONG WindowLength
+	);
+#endif
 
 NTSYSAPI
 LOGICAL
@@ -9908,6 +10548,7 @@ TpWaitForTimer(
 	_In_ LOGICAL CancelPendingCallbacks
 	);
 
+_Check_return_
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -9934,6 +10575,19 @@ TpSetWait(
 	_In_opt_ PLARGE_INTEGER Timeout
 	);
 
+#if NTDDI_VERSION >= NTDDI_WIN7
+NTSYSAPI
+NTSTATUS
+NTAPI
+TpSetWaitEx(
+	_Inout_ PTP_WAIT Wait,
+	_In_opt_ HANDLE Handle,
+	_In_opt_ PLARGE_INTEGER Timeout,
+	_In_opt_ PVOID Reserved
+	);
+#endif
+	
+_Check_return_
 NTSYSAPI
 NTSTATUS
 NTAPI
