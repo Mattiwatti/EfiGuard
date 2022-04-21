@@ -2,7 +2,7 @@
 EfiGuard is a portable x64 UEFI bootkit that patches the Windows boot manager, boot loader and kernel at boot time in order to disable PatchGuard and Driver Signature Enforcement (DSE).
 
 # Features
-- Currently supports all EFI-compatible versions of Windows x64 ever released, from Vista SP1 to Server 2019.
+- Currently supports all EFI-compatible versions of Windows x64 ever released, from Vista SP1 to Windows 11.
 - Easy to use: can be booted from a USB stick or the Windows EFI partition via a loader that automatically finds and boots Windows. The driver can also be loaded and configured manually using either the UEFI shell or the loader.
 - Makes extensive use of the [Zydis](https://github.com/zyantific/zydis) disassembler library for fast runtime instruction decoding to support more robust analysis than what is possible with signature matching, which often requires changes with new OS updates.
 - Works passively: the driver does not load or start the Windows boot manager. Instead it acts on a load of `bootmgfw.efi` by the firmware boot manager via the boot selection menu or an EFI application such as the loader. If a non-Windows OS is booted, the driver will automatically unload itself.
@@ -44,10 +44,10 @@ There are two ways to use EfiGuard: booting the loader (easiest), or using the U
 EfiGuard requires EDK2 to build. If you don't have EDK2 installed, follow the steps in [Getting Started with EDK2](https://github.com/tianocore/tianocore.github.io/wiki/Getting-Started-with-EDK-II) first as the EDK2 build system is fairly complex to set up. This section assumes you have a `workspace` directory that your `WORKSPACE` environment variable points to, with a copy of EDK2 checked out in `workspace/edk2`. Supported compilers are MSVC, Clang, GCC and ICC.
 1. Clone the EfiGuard repository into `workspace/edk2/EfiGuardPkg`.
 2. Open a prompt or shell that sets up the environment variables for EDK2.
-3. Run `build -a X64 -t VS2017 -p EfiGuardPkg/EfiGuardPkg.dsc -b RELEASE`, substituting your toolchain for VS2017.
+3. Run `build -a X64 -t VS2019 -p EfiGuardPkg/EfiGuardPkg.dsc -b RELEASE`, substituting your toolchain for VS2019.
 
 
-This will produce `EfiGuardDxe.efi` and `Loader.efi` in `workspace/Build/EfiGuard/RELEASE_VS2017/X64`.
+This will produce `EfiGuardDxe.efi` and `Loader.efi` in `workspace/Build/EfiGuard/RELEASE_VS2019/X64`.
 To build the interactively configurable loader, append `-D CONFIGURE_DRIVER=1` to the build command.
 
 ## Compiling EfiDSEFix
