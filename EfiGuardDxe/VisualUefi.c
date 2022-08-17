@@ -17,6 +17,8 @@ CONST UINT8 _gDriverUnloadImageCount = 1;
 CONST UINT32 _gUefiDriverRevision = 0x210;
 CONST UINT32 _gDxeRevision = 0x210;
 CHAR8 *gEfiCallerBaseName = "EfiGuardDxe";
+BOOLEAN mPostEBS = FALSE;
+EFI_SYSTEM_TABLE *mDebugST = NULL;
 
 
 //
@@ -71,7 +73,6 @@ GetPerformanceCounterProperties(
 //
 // Entry/unload handlers that VisualUefi expects with predefined names
 //
-extern
 EFI_STATUS
 EFIAPI
 EfiGuardInitialize(
@@ -89,7 +90,6 @@ UefiMain(
 	return EfiGuardInitialize(ImageHandle, SystemTable);
 }
 
-extern
 EFI_STATUS
 EFIAPI
 EfiGuardUnload(
