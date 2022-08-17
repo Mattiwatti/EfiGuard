@@ -35,7 +35,7 @@ RtlSleep(
 VOID
 EFIAPI
 PrintLoadedImageInfo(
-	IN EFI_LOADED_IMAGE *ImageInfo
+	IN CONST EFI_LOADED_IMAGE *ImageInfo
 	)
 {
 	CHAR16* PathString = ConvertDevicePathToText(ImageInfo->FilePath, TRUE, TRUE);
@@ -361,7 +361,7 @@ BacktrackToFunctionStart(
 	CONST UINT32 RelativeAddress = (UINT32)(AddressInFunction - ImageBase);
 	PRUNTIME_FUNCTION FunctionEntry = NULL;
 	INT32 Low = 0;
-	INT32 High = (FunctionTableSize / sizeof(RUNTIME_FUNCTION)) - 1;
+	INT32 High = (INT32)(FunctionTableSize / sizeof(RUNTIME_FUNCTION)) - 1;
 	
 	while (High >= Low)
 	{

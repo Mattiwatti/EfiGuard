@@ -223,7 +223,7 @@ GetProcedureAddress(
 EFI_STATUS
 EFIAPI
 FindIATAddressForImport(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN CONST CHAR8* ImportDllName,
 	IN CONST CHAR8* FunctionName,

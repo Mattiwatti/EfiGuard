@@ -167,7 +167,7 @@ GetProcedureAddress(
 	// Look up the import name in the name table using a binary search
 	LONG Low = 0;
 	LONG Middle = 0;
-	LONG High = ExportDirectory->NumberOfNames - 1;
+	LONG High = static_cast<LONG>(ExportDirectory->NumberOfNames) - 1;
 
 	while (High >= Low)
 	{

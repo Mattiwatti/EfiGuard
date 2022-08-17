@@ -19,7 +19,7 @@ RtlSleep(
 VOID
 EFIAPI
 PrintLoadedImageInfo(
-	IN EFI_LOADED_IMAGE *ImageInfo
+	IN CONST EFI_LOADED_IMAGE *ImageInfo
 	);
 
 //

@@ -182,7 +182,7 @@ GetProcedureAddress(
 	// Look up the import name in the name table using a binary search
 	INT32 Low = 0;
 	INT32 Middle = 0;
-	INT32 High = ExportDirectory->NumberOfNames - 1;
+	INT32 High = (INT32)ExportDirectory->NumberOfNames - 1;
 
 	while (High >= Low)
 	{
@@ -211,7 +211,7 @@ GetProcedureAddress(
 EFI_STATUS
 EFIAPI
 FindIATAddressForImport(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN CONST CHAR8* ImportDllName,
 	IN CONST CHAR8* FunctionName,

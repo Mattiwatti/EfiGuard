@@ -564,7 +564,7 @@ TryBootOptionsInOrder(
 		ImageInfo->ParentHandle = NULL;
 
 		// Enable the Watchdog Timer for 5 minutes before calling the image
-		gBS->SetWatchdogTimer(5 * 60, 0x0000, 0x00, NULL);
+		gBS->SetWatchdogTimer((UINTN)(5 * 60), 0x0000, 0x00, NULL);
 
 		// Start the image and set the return code in the boot option status
 		Status = gBS->StartImage(ImageHandle,

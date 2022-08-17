@@ -30,7 +30,7 @@ EfiGuardUnload(
 EFI_STATUS
 EFIAPI
 DriverConfigure(
-	IN EFIGUARD_CONFIGURATION_DATA* ConfigurationData
+	IN CONST EFIGUARD_CONFIGURATION_DATA* ConfigurationData
 	);
 
 EFIGUARD_DRIVER_PROTOCOL gEfiGuardDriverProtocol =
@@ -453,7 +453,7 @@ SetVirtualAddressMapEvent(
 EFI_STATUS
 EFIAPI
 DriverConfigure(
-	IN EFIGUARD_CONFIGURATION_DATA* ConfigurationData
+	IN CONST EFIGUARD_CONFIGURATION_DATA* ConfigurationData
 	)
 {
 	// Do not allow configure if we are at runtime, or if the Windows boot manager has been loaded

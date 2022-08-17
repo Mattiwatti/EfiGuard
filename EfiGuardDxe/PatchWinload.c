@@ -53,8 +53,8 @@ STATIC
 PKLDR_DATA_TABLE_ENTRY
 EFIAPI
 GetBootLoadedModule(
-	IN LIST_ENTRY* LoadOrderListHead,
-	IN CHAR16* ModuleName
+	IN CONST LIST_ENTRY* LoadOrderListHead,
+	IN CONST CHAR16* ModuleName
 	)
 {
 	if (ModuleName == NULL || LoadOrderListHead == NULL)
