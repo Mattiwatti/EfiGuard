@@ -83,7 +83,7 @@ HookedOslFwpKernelSetupPhase1(
 	CopyMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gOslFwpKernelSetupPhase1Backup, sizeof(gOslFwpKernelSetupPhase1Backup));
 
 	UINT8* LoadOrderListHeadAddress = (UINT8*)&LoaderBlock->LoadOrderListHead;
-	if (gKernelPatchInfo.LegacyLoaderBlock)
+	if (gKernelPatchInfo.BuildNumber < 7600)
 	{
 		// We are booting Vista or some other fossil, which means that our LOADER_PARAMETER_BLOCK declaration in no way matches what is
 		// actually being passed by the loader. Notably, the first four UINT32 fields are absent, so fix up the list entry pointer.
@@ -570,8 +570,8 @@ PatchWinload(
 			goto Exit;
 		}
 
-		// Some... adjustments... need to be made later on in the case of pre-Windows 7 loader blocks
-		gKernelPatchInfo.LegacyLoaderBlock = BuildNumber < 7600;
+		// Some... adjustments... need to be made later on in the case of pre-Windows 7 loader blocks, so store the build number
+		gKernelPatchInfo.BuildNumber = BuildNumber;
 	}
 
 	// Find the .text and .rdata sections

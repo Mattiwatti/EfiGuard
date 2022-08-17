@@ -202,7 +202,7 @@ typedef struct _KERNEL_PATCH_INFORMATION
 	EFI_STATUS Status;
 	UINTN BufferSize;			// In bytes, excluding null terminator. This may be 0. The maximum buffer size is simply sizeof(Buffer).
 	CHAR16 Buffer[8192];		// 8K ought to be enough for everyone
-	BOOLEAN LegacyLoaderBlock;	// TRUE if the loader block provided by winload.efi will be for Vista or older kernels
+	UINT32 BuildNumber;			// Used to determine whether the loader block provided by winload.efi will be for Vista (or older) kernels
 	VOID* KernelBase;
 } KERNEL_PATCH_INFORMATION;
 

@@ -360,7 +360,7 @@ ExitBootServicesEvent(
 				WaitForKey();
 			}
 		}
-		else
+		else if (gKernelPatchInfo.BuildNumber >= 6000)
 		{
 			// Patch failed. Most important stuff first: make a fake BSOD, because... reasons
 			// TODO if really bored: use GOP to set the BG colour on the whole screen.
@@ -629,7 +629,7 @@ EfiGuardInitialize(
 	gKernelPatchInfo.Status = EFI_SUCCESS;
 	gKernelPatchInfo.BufferSize = 0;
 	SetMem64(gKernelPatchInfo.Buffer, sizeof(gKernelPatchInfo.Buffer), 0ULL);
-	gKernelPatchInfo.LegacyLoaderBlock = FALSE;
+	gKernelPatchInfo.BuildNumber = 0;
 	gKernelPatchInfo.KernelBase = NULL;
 
 	// Wipe our image info and PE headers
