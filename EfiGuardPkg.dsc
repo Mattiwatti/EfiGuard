@@ -23,7 +23,7 @@
   CpuLib|MdePkg/Library/BaseCpuLib/BaseCpuLib.inf
   PciCf8Lib|MdePkg/Library/BasePciCf8Lib/BasePciCf8Lib.inf
   PciLib|MdePkg/Library/BasePciLibCf8/BasePciLibCf8.inf
-  IoLib|MdePkg/Library/BaseIoLibIntrinsic/BaseIoLibIntrinsicSev.inf
+  IoLib|MdePkg/Library/BaseIoLibIntrinsic/BaseIoLibIntrinsic.inf
   SerialPortLib|PcAtChipsetPkg/Library/SerialIoLib/SerialIoLib.inf
 
   # UEFI and PI
@@ -110,8 +110,11 @@
   # Use sane linker flags instead of EDK2 defaults
   MSFT:*_*_*_DLINK_FLAGS = /ALIGN:0x1000 /FILEALIGN:0x200 /SECTION:.pdata,!D /MERGE:.rdata=.text /DEBUG:FULL /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB%
   INTEL:*_*_*_DLINK_FLAGS = /ALIGN:0x1000 /FILEALIGN:0x200 /SECTION:.pdata,!D /MERGE:.rdata=.text /DEBUG:FULL /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB%
+!if $(TOOL_CHAIN_TAG) != "XCODE5" && $(TOOL_CHAIN_TAG) != "CLANGPDB"
   GCC:*_*_*_DLINK_FLAGS = -z common-page-size=0x1000
-  GCC:*_CLANGPDB_*_DLINK_FLAGS = /ALIGN:0x1000 /FILEALIGN:0x200 /DRIVER
+!else if $(TOOL_CHAIN_TAG) == "CLANGPDB"
+  GCC:*_*_*_DLINK_FLAGS = /ALIGN:0x1000 /FILEALIGN:0x200 /DRIVER
+!endif
 
   # Tell GenFw not to drop the exception table or the optional header containing the checksum
   *:*_*_X64_GENFW_FLAGS = --keepexceptiontable --keepzeropending --keepoptionalheader
