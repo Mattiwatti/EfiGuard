@@ -99,6 +99,33 @@ PrintKernelPatchInfo(
 	}
 }
 
+INTN
+EFIAPI
+StrniCmp(
+	IN CONST CHAR16 *FirstString,
+	IN CONST CHAR16 *SecondString,
+	IN UINTN Length
+	)
+{
+	if (FirstString == NULL || SecondString == NULL || Length == 0)
+		return 0;
+
+	CHAR16 UpperFirstChar = CharToUpper(*FirstString);
+	CHAR16 UpperSecondChar = CharToUpper(*SecondString);
+	while ((*FirstString != L'\0') && (*SecondString != L'\0') &&
+		(UpperFirstChar == UpperSecondChar) &&
+		(Length > 1))
+	{
+		FirstString++;
+		SecondString++;
+		UpperFirstChar = CharToUpper(*FirstString);
+		UpperSecondChar = CharToUpper(*SecondString);
+		Length--;
+	}
+
+	return UpperFirstChar - UpperSecondChar;
+}
+
 BOOLEAN
 EFIAPI
 WaitForKey(

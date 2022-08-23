@@ -46,6 +46,17 @@ PrintKernelPatchInfo(
 	);
 
 //
+// Case-insensitive string comparison.
+//
+INTN
+EFIAPI
+StrniCmp(
+	IN CONST CHAR16 *FirstString,
+	IN CONST CHAR16 *SecondString,
+	IN UINTN Length
+	);
+
+//
 // Waits for a key to be pressed before continuing execution.
 // Returns FALSE if ESC was pressed to abort, TRUE otherwise.
 //

@@ -64,7 +64,7 @@ GetBootLoadedModule(
 	{
 		// This is fairly heavy abuse of CR(), but legal C because (only) the first field of a struct is guaranteed to be at offset 0 (C99 6.7.2.1, point 13)
 		CONST PBLDR_DATA_TABLE_ENTRY Entry = (PBLDR_DATA_TABLE_ENTRY)BASE_CR(ListEntry, KLDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
-		if (Entry != NULL && StrnCmp(Entry->KldrEntry.BaseDllName.Buffer, ModuleName, (Entry->KldrEntry.BaseDllName.Length / sizeof(CHAR16))) == 0)
+		if (Entry != NULL && StrniCmp(Entry->KldrEntry.BaseDllName.Buffer, ModuleName, (Entry->KldrEntry.BaseDllName.Length / sizeof(CHAR16))) == 0)
 			return &Entry->KldrEntry;
 	}
 	return NULL;
