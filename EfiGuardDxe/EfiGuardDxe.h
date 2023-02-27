@@ -213,10 +213,11 @@ extern KERNEL_PATCH_INFORMATION gKernelPatchInfo;
 // Appends a kernel patch status info or error message to the buffer for delayed printing,
 // and prints it to a boot debugger immediately if one is connected.
 //
-#define PRINT_KERNEL_PATCH_MSG(Fmt, ...) { \
-	gBlStatusPrint(Fmt, ##__VA_ARGS__); \
-	AppendKernelPatchMessage(Fmt, ##__VA_ARGS__); \
-	}
+#define PRINT_KERNEL_PATCH_MSG(Fmt, ...) \
+	do { \
+		gBlStatusPrint(Fmt, ##__VA_ARGS__); \
+		AppendKernelPatchMessage(Fmt, ##__VA_ARGS__); \
+	} while (FALSE)
 
 #ifdef __cplusplus
 }
