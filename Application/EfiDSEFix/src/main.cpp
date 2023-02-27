@@ -7,14 +7,18 @@ PrintUsage(
 	_In_ PCWCHAR ProgramName
 	)
 {
+	const BOOLEAN Win8OrHigher = (RtlNtMajorVersion() >= 6 && RtlNtMinorVersion() >= 2) || RtlNtMajorVersion() > 6;
+	const PCWCHAR CiOptionsName = Win8OrHigher ? L"g_CiOptions" : L"g_CiEnabled";
 	Printf(L"\nUsage: %ls [COMMAND]\n\n"
 		L"Commands:\n\n"
 		L"-c, --check%17lsTest backdoor hook\n"
+		L"-r, --read%18lsRead current %ls value\n"
 		L"-d, --disable%15lsDisable DSE\n"
 		L"-e, --enable%ls%2ls(Re)enable DSE\n"
 		L"-i, --info%18lsDump system info\n",
 		ProgramName, L"", L"",
-		(NtCurrentPeb()->OSBuildNumber >= 9200 ? L" [g_CiOptions]" : L"              "),
+		CiOptionsName, L"",
+		(Win8OrHigher ? L" [g_CiOptions]" : L"              "),
 		L"", L"");
 }
 
@@ -31,7 +35,12 @@ int wmain(int argc, wchar_t** argv)
 	}
 
 	// Parse command line params
+	const BOOLEAN Win8OrHigher = (RtlNtMajorVersion() >= 6 && RtlNtMinorVersion() >= 2) || RtlNtMajorVersion() > 6;
+	const ULONG EnabledCiOptionsValue = Win8OrHigher ? 0x6 : CODEINTEGRITY_OPTION_ENABLED;
+	const PCWCHAR CiOptionsName = Win8OrHigher ? L"g_CiOptions" : L"g_CiEnabled";
 	ULONG CiOptionsValue = 0;
+	BOOLEAN ReadOnly = FALSE;
+
 	if (wcsncmp(argv[1], L"-c", sizeof(L"-c") / sizeof(WCHAR) - 1) == 0 ||
 		wcsncmp(argv[1], L"--check", sizeof(L"--check") / sizeof(WCHAR) - 1) == 0)
 	{
@@ -41,7 +50,14 @@ int wmain(int argc, wchar_t** argv)
 			Printf(L"Success!\n");
 		return Status;
 	}
-	if (wcsncmp(argv[1], L"-d", sizeof(L"-d") / sizeof(WCHAR) - 1) == 0 ||
+	if (wcsncmp(argv[1], L"-r", sizeof(L"-r") / sizeof(WCHAR) - 1) == 0 ||
+		wcsncmp(argv[1], L"--read", sizeof(L"--read") / sizeof(WCHAR) - 1) == 0)
+	{
+		CiOptionsValue = 0;
+		ReadOnly = TRUE;
+		Printf(L"Querying %ls value...\n", CiOptionsName);
+	}
+	else if (wcsncmp(argv[1], L"-d", sizeof(L"-d") / sizeof(WCHAR) - 1) == 0 ||
 		wcsncmp(argv[1], L"--disable", sizeof(L"--disable") / sizeof(WCHAR) - 1) == 0)
 	{
 		CiOptionsValue = 0;
@@ -50,14 +66,14 @@ int wmain(int argc, wchar_t** argv)
 	else if (wcsncmp(argv[1], L"-e", sizeof(L"-e") / sizeof(WCHAR) - 1) == 0 ||
 		wcsncmp(argv[1], L"--enable", sizeof(L"--enable") / sizeof(WCHAR) - 1) == 0)
 	{
-		if (NtCurrentPeb()->OSBuildNumber >= 9200)
+		if (Win8OrHigher)
 		{
-			CiOptionsValue = argc == 3 ? wcstoul(argv[2], nullptr, 16) : 0x6;
-			Printf(L"(Re)enabling DSE [g_CiOptions value = 0x%X]...\n", CiOptionsValue);
+			CiOptionsValue = argc == 3 ? wcstoul(argv[2], nullptr, 16) : EnabledCiOptionsValue;
+			Printf(L"(Re)enabling DSE [%ls value = 0x%lX]...\n", CiOptionsName, CiOptionsValue);
 		}
 		else
 		{
-			CiOptionsValue = CODEINTEGRITY_OPTION_ENABLED;
+			CiOptionsValue = EnabledCiOptionsValue;
 			Printf(L"(Re)enabling DSE...\n");
 		}
 	}
@@ -69,7 +85,7 @@ int wmain(int argc, wchar_t** argv)
 
 	// Trigger EFI driver exploit and write new value to g_CiOptions/g_CiEnabled
 	ULONG OldCiOptionsValue;
-	const NTSTATUS Status = AdjustCiOptions(CiOptionsValue, &OldCiOptionsValue);
+	const NTSTATUS Status = AdjustCiOptions(CiOptionsValue, &OldCiOptionsValue, ReadOnly);
 
 	// Print result
 	if (!NT_SUCCESS(Status))
@@ -78,12 +94,11 @@ int wmain(int argc, wchar_t** argv)
 	}
 	else
 	{
-		Printf(L"Successfully %ls DSE.", CiOptionsValue == 0 ? L"disabled" : L"(re)enabled");
-		if (NtCurrentPeb()->OSBuildNumber >= 9200)
-		{
-			Printf(L" Original g_CiOptions value: 0x%X", OldCiOptionsValue);
-		}
-		Printf(L"\n");
+		if (ReadOnly)
+			Printf(L"Success.");
+		else
+			Printf(L"Successfully %ls DSE. Original", CiOptionsValue == 0 ? L"disabled" : L"(re)enabled");
+		Printf(L" %ls value: 0x%lX\n", CiOptionsName, OldCiOptionsValue);
 	}
 	return Status;
 }

