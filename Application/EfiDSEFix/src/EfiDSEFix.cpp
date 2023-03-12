@@ -192,8 +192,8 @@ AnalyzeCi(
 
 	// Map file as SEC_IMAGE
 	WCHAR Path[MAX_PATH];
-	const CHAR NtoskrnlExe[] = "ntoskrnl.exe";
-	const CHAR CiDll[] = "CI.dll";
+	constexpr CHAR NtoskrnlExe[] = "ntoskrnl.exe";
+	constexpr CHAR CiDll[] = "CI.dll";
 
 	_snwprintf(Path, MAX_PATH / sizeof(WCHAR), L"%ls\\System32\\%hs",
 		SharedUserData->NtSystemRoot,

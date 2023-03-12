@@ -36,7 +36,6 @@ STATIC CHAR16* mDriverPaths[] = {
 };
 
 
-extern
 VOID
 EFIAPI
 BmSetMemoryTypeInformationVariable(
@@ -48,6 +47,7 @@ STATIC
 BOOLEAN
 EFIAPI
 WaitForKey(
+	VOID
 	)
 {
 	EFI_INPUT_KEY Key = { 0, 0 };
@@ -55,7 +55,7 @@ WaitForKey(
 	gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
 	gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);
 
-	return (BOOLEAN)(Key.ScanCode != SCAN_ESC);
+	return Key.ScanCode != SCAN_ESC;
 }
 
 #if CONFIGURE_DRIVER

@@ -400,7 +400,7 @@ DisablePatchGuard(
 	// Print info
 	PRINT_KERNEL_PATCH_MSG(L"\r\n    Patched KeInitAmd64SpecificState [RVA: 0x%X].\r\n",
 		(UINT32)(KeInitAmd64SpecificState - ImageBase));
-	PRINT_KERNEL_PATCH_MSG(L"    Patched %S [RVA: 0x%X].\r\n",
+	PRINT_KERNEL_PATCH_MSG(L"    Patched %ls [RVA: 0x%X].\r\n",
 		FuncName, (UINT32)(CcInitializeBcbProfiler - ImageBase));
 	if (ExpLicenseWatchInitWorker != NULL)
 	{
