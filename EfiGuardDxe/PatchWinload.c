@@ -33,6 +33,15 @@ STATIC CONST UINT8 SigBlStatusPrint[] = {
 	0x74, 0xCC										// jz XX
 };
 
+// EFI vendor GUID used by Microsoft
+STATIC CONST EFI_GUID MicrosoftVendorGuid = {
+	0x77fa9abd, 0x0359, 0x4d32, { 0xbd, 0x60, 0x28, 0xf4, 0xe7, 0x8f, 0x78, 0x4b }
+};
+
+// EFI variable used to set VBS enablement. Set by SecConfig.efi when disabling VBS/IUM,
+// read (and then deleted) by winload.efi during boot
+STATIC CONST CHAR16 VbsPolicyDisabledVariableName[] = L"VbsPolicyDisabled";
+
 
 NTSTATUS
 EFIAPI
@@ -68,6 +77,45 @@ GetBootLoadedModule(
 			return &Entry->KldrEntry;
 	}
 	return NULL;
+}
+
+//
+// Disables VBS for this boot
+//
+STATIC
+EFI_STATUS
+EFIAPI
+DisableVbs(
+	VOID
+	)
+{
+	CONST BOOLEAN Disabled = TRUE;
+	UINT32 Attributes;
+	UINTN Size = 0;
+
+	// Clear VbsPolicyDisabled variable if needed
+	EFI_STATUS Status = gRT->GetVariable((CHAR16*)VbsPolicyDisabledVariableName,
+										(EFI_GUID*)&MicrosoftVendorGuid,
+										&Attributes,
+										&Size,
+										NULL);
+	if (Status != EFI_NOT_FOUND &&
+		(Attributes != (EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS) || Size != sizeof(Disabled)))
+	{
+		gRT->SetVariable((CHAR16*)VbsPolicyDisabledVariableName,
+						(EFI_GUID*)&MicrosoftVendorGuid,
+						0,
+						0,
+						NULL);
+	}
+
+	// Write the new value
+	Status = gRT->SetVariable((CHAR16*)VbsPolicyDisabledVariableName,
+							(EFI_GUID*)&MicrosoftVendorGuid,
+							EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+							sizeof(Disabled),
+							(BOOLEAN*)&Disabled);
+	return Status;
 }
 
 //
@@ -594,9 +642,9 @@ PatchWinload(
 	ASSERT(CodeSection != NULL);
 	ASSERT(PatternSection != NULL);
 
-	// (Optional) On Windows 10, find winload!BlStatusPrint
 	if (BuildNumber >= 10240)
 	{
+		// (Optional) find winload!BlStatusPrint
 		gBlStatusPrint = (t_BlStatusPrint)GetProcedureAddress((UINTN)ImageBase, NtHeaders, "BlStatusPrint");
 		if (gBlStatusPrint == NULL)
 		{
@@ -613,6 +661,11 @@ PatchWinload(
 				Print(L"\r\nWARNING: winload!BlStatusPrint not found. No boot debugger output will be available.\r\n");
 			}
 		}
+
+		// Disable VBS for the duration of this boot
+		Status = DisableVbs();
+		if (EFI_ERROR(Status))
+			Print(L"\r\nWARNING: failed to set EFI runtime variable \"%ls\" in order to disable VBS.\r\n", VbsPolicyDisabledVariableName);
 	}
 
 	// Find winload!OslFwpKernelSetupPhase1
@@ -620,7 +673,7 @@ PatchWinload(
 										NtHeaders,
 										CodeSection,
 										PatternSection,
-										(BOOLEAN)(BuildNumber >= 10240),
+										BuildNumber >= 10240,
 										(UINT8**)&gOriginalOslFwpKernelSetupPhase1);
 	if (EFI_ERROR(Status))
 	{

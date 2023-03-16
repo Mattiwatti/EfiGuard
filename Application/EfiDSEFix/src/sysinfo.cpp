@@ -157,7 +157,7 @@ DumpSystemInformation(
 			Printf(L"SystemIsolatedUserModeInformation: error %08lX\n\n", Status);
 		else
 			Printf(L"SystemIsolatedUserModeInformation:\n\t- SecureKernelRunning: %hhu\n\t- HvciEnabled: %hhu\n\t- HvciStrictMode: %hhu\n"
-				"\t- DebugEnabled: %hhu\n\t- FirmwarePageProtection: %hhu\n\t- EncryptionKeyAvailable: %hhu\n\t- TrustletRunning: %hhu\n\t- HvciDisableAllowed: %hhu\n\n",
+				"\t- DebugEnabled: %hhu\n\t- FirmwarePageProtection: %hhu\n\t- EncryptionKeyAvailable: %hhu\n\t- TrustletRunning: %hhu\n\t- HvciDisableAllowed: %hhu\n",
 				IumInfo.SecureKernelRunning, IumInfo.HvciEnabled, IumInfo.HvciStrictMode, IumInfo.DebugEnabled, IumInfo.FirmwarePageProtection,
 				IumInfo.EncryptionKeyAvailable, IumInfo.TrustletRunning, IumInfo.HvciDisableAllowed);
 	}

@@ -183,6 +183,32 @@ QueryCiOptions(
 }
 
 static
+BOOLEAN
+QueryVbsEnabled(
+	)
+{
+	SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrityInfo = { sizeof(SYSTEM_CODEINTEGRITY_INFORMATION) };
+	NTSTATUS Status = NtQuerySystemInformation(SystemCodeIntegrityInformation,
+												&CodeIntegrityInfo,
+												sizeof(CodeIntegrityInfo),
+												nullptr);
+	if (NT_SUCCESS(Status) &&
+		(CodeIntegrityInfo.CodeIntegrityOptions & (CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED | CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED)) != 0)
+		return TRUE;
+
+	SYSTEM_ISOLATED_USER_MODE_INFORMATION IumInfo = { 0 };
+	Status = NtQuerySystemInformation(SystemIsolatedUserModeInformation,
+									&IumInfo,
+									sizeof(IumInfo),
+									nullptr);
+	if (NT_SUCCESS(Status) &&
+		(IumInfo.SecureKernelRunning || IumInfo.HvciEnabled))
+		return TRUE;
+
+	return FALSE;
+}
+
+static
 NTSTATUS
 AnalyzeCi(
 	_Out_ PVOID *CiOptionsAddress
@@ -289,6 +315,15 @@ TestSetVariableHook(
 	{
 		Printf(L"Fatal error: failed to acquire SE_SYSTEM_ENVIRONMENT_PRIVILEGE. Make sure you are running as administrator.\n");
 		return Status;
+	}
+
+	if (QueryVbsEnabled())
+	{
+		Printf(L"Fatal error: VBS (Virtualization Based Security) is enabled and running on this system.\n"
+			"Attempting to read or write to or from kernel space using EFI runtime services will result in a bugcheck.\n"
+			"Either the EfiGuard DXE driver is not loaded, or it failed to disable VBS during boot.\n"
+			"Not continuing.\n");
+		return STATUS_NOT_SUPPORTED;
 	}
 
 	// Find some kernel address to read
