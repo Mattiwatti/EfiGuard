@@ -230,7 +230,7 @@ AnalyzeCi(
 	NTSTATUS Status = MapFileSectionView(Path, &MappedBase, &ViewSize);
 	if (!NT_SUCCESS(Status))
 	{
-		Printf(L"Failed to map %ls: %08X\n", Path, Status);
+		Printf(L"Failed to map %ls: 0x%08lX\n", Path, Status);
 		return Status;
 	}
 
@@ -351,14 +351,11 @@ TestSetVariableHook(
 											EFIGUARD_BACKDOOR_VARIABLE_ATTRIBUTES);
 	if (!NT_SUCCESS(Status))
 	{
-		Printf(L"Failure: NtSetSystemEnvironmentValueEx error %08X\n", Status);
-		goto Exit;
+		Printf(L"Failure: NtSetSystemEnvironmentValueEx error 0x%08lX\n", Status);
 	}
-
-	// Did we get any data back?
-	if (BackdoorData.u.Qword == UINT64_MAX)
+	else if (BackdoorData.u.Qword == UINT64_MAX)
 	{
-		Printf(L"Failure: EFI SetVariable() did not return any data.\nThe EfiGuard DXE driver is either not loaded in SETVARIABLE_HOOK mode, or it is malfunctioning.\n");
+		Printf(L"Failure: EFI SetVariable() did not return any data.\n");
 
 		// Clean up, since we actually wrote a variable to NVRAM here...
 		NtSetSystemEnvironmentValueEx(&VariableName,
@@ -367,6 +364,11 @@ TestSetVariableHook(
 									0,
 									EFIGUARD_BACKDOOR_VARIABLE_ATTRIBUTES);
 		Status = STATUS_NO_SUCH_DEVICE;
+	}
+
+	if (!NT_SUCCESS(Status))
+	{
+		Printf(L"The EfiGuard DXE driver is either not loaded in SETVARIABLE_HOOK mode, or it is malfunctioning.\n");
 		goto Exit;
 	}
 
@@ -430,7 +432,7 @@ TriggerExploit(
 											EFIGUARD_BACKDOOR_VARIABLE_ATTRIBUTES);
 	if (!NT_SUCCESS(Status))
 	{
-		Printf(L"NtSetSystemEnvironmentValueEx: error %08X\n", Status);
+		Printf(L"NtSetSystemEnvironmentValueEx: error 0x%08lX\n", Status);
 		return Status;
 	}
 

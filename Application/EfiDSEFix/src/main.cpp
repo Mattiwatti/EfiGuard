@@ -90,7 +90,7 @@ int wmain(int argc, wchar_t** argv)
 	// Print result
 	if (!NT_SUCCESS(Status))
 	{
-		Printf(L"AdjustCiOptions failed: %08X\n", Status);
+		Printf(L"AdjustCiOptions failed: 0x%08lX\n", Status);
 	}
 	else
 	{
