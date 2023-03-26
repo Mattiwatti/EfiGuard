@@ -542,6 +542,10 @@ TryBootOptionsInOrder(
 
 		if (EFI_ERROR(Status))
 		{
+			// Unload if execution could not be deferred to avoid a resource leak
+			if (Status == EFI_SECURITY_VIOLATION)
+				gBS->UnloadImage(ImageHandle);
+
 			Print(L"LoadImage error %llx (%r)\r\n", Status, Status);
 			continue;
 		}
