@@ -176,34 +176,43 @@ LocateFile(
 STATIC
 EFI_STATUS
 EFIAPI
-SetHighestAvailableMode(
+SetHighestAvailableTextMode(
 	VOID
 	)
 {
+	if (gST->ConOut == NULL)
+		return EFI_NOT_READY;
+
 	INT32 MaxModeNum = 0;
-	UINTN Cols, Rows, MaxColsXRows = 0;
+	UINTN Cols, Rows, MaxWeightedColsXRows = 0;
+	EFI_STATUS Status = EFI_SUCCESS;
 
 	for (INT32 ModeNum = 0; ModeNum < gST->ConOut->Mode->MaxMode; ModeNum++)
 	{
-		CONST EFI_STATUS Status = gST->ConOut->QueryMode(gST->ConOut, ModeNum, &Cols, &Rows);
+		Status = gST->ConOut->QueryMode(gST->ConOut, ModeNum, &Cols, &Rows);
 		if (EFI_ERROR(Status))
 			continue;
 
-		// Accept only modes where the total of (Rows * Columns) >= the previous known best
-		if ((Cols * Rows) >= MaxColsXRows)
+		// Accept only modes where the total of (Rows * Columns) >= the previous known best.
+		// Use 16:10 as an arbitrary weighting that lies in between the common 4:3 and 16:9 ratios
+		CONST UINTN WeightedColsXRows = (16 * Rows) * (10 * Cols);
+		if (WeightedColsXRows >= MaxWeightedColsXRows)
 		{
-			MaxColsXRows = Cols * Rows;
+			MaxWeightedColsXRows = WeightedColsXRows;
 			MaxModeNum = ModeNum;
 		}
 	}
 
-	if (gST->ConOut->Mode->Mode == MaxModeNum)
+	if (gST->ConOut->Mode->Mode != MaxModeNum)
 	{
-		// We're already at the correct mode
-		return EFI_SUCCESS;
+		Status = gST->ConOut->SetMode(gST->ConOut, MaxModeNum);
 	}
 
-	return gST->ConOut->SetMode(gST->ConOut, MaxModeNum);
+	// Clear screen and enable cursor
+	gST->ConOut->ClearScreen(gST->ConOut);
+	gST->ConOut->EnableCursor(gST->ConOut, TRUE);
+
+	return Status;
 }
 
 //
@@ -618,18 +627,12 @@ UefiMain(
 	//
 	// Set the highest available console mode and clear the screen
 	//
-	SetHighestAvailableMode();
-	gST->ConOut->ClearScreen(gST->ConOut);
+	SetHighestAvailableTextMode();
 
 	//
 	// Turn off the watchdog timer
 	//
 	gBS->SetWatchdogTimer(0, 0, 0, NULL);
-
-	//
-	// Enable cursor
-	//
-	gST->ConOut->EnableCursor(gST->ConOut, TRUE);
 
 	//
 	// Locate, load, start and configure the driver
