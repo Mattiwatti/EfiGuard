@@ -11,7 +11,6 @@
 #include <Library/DevicePathLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiBootManagerLib.h>
-#include <Library/DxeServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 
 
@@ -213,70 +212,6 @@ SetHighestAvailableTextMode(
 	gST->ConOut->EnableCursor(gST->ConOut, TRUE);
 
 	return Status;
-}
-
-//
-// Connects all current system handles recursively.
-//
-STATIC
-EFI_STATUS
-EFIAPI
-BdsLibConnectAllEfi(
-	VOID
-	)
-{
-	UINTN HandleCount;
-	EFI_HANDLE *HandleBuffer;
-	CONST EFI_STATUS Status = gBS->LocateHandleBuffer(AllHandles,
-													NULL,
-													NULL,
-													&HandleCount,
-													&HandleBuffer);
-	if (EFI_ERROR(Status))
-		return Status;
-
-	for (UINTN Index = 0; Index < HandleCount; ++Index)
-	{
-		gBS->ConnectController(HandleBuffer[Index],
-								NULL,
-								NULL,
-								TRUE);
-	}
-
-	if (HandleBuffer != NULL)
-		FreePool(HandleBuffer);
-
-	return EFI_SUCCESS;
-}
-
-//
-// Connects all drivers to all controllers.
-//
-STATIC
-VOID
-EFIAPI
-BdsLibConnectAllDriversToAllControllers(
-	VOID
-	)
-{
-	EFI_STATUS Status;
-
-	do
-	{
-		//
-		// Connect All EFI 1.10 drivers following EFI 1.10 algorithm
-		//
-		BdsLibConnectAllEfi();
-
-		//
-		// Check to see if it's possible to dispatch an more DXE drivers.
-		// The BdsLibConnectAllEfi() may have made new DXE drivers show up.
-		// If anything is Dispatched Status == EFI_SUCCESS and we will try
-		// the connect again.
-		//
-		Status = gDS->Dispatch();
-
-	} while (!EFI_ERROR(Status));
 }
 
 STATIC
@@ -622,7 +557,7 @@ UefiMain(
 	//
 	// Connect all drivers to all controllers
 	//
-	BdsLibConnectAllDriversToAllControllers();
+	EfiBootManagerConnectAll();
 
 	//
 	// Set the highest available console mode and clear the screen
