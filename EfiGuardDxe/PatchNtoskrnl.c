@@ -384,19 +384,19 @@ DisablePatchGuard(
 	// We have all the addresses we need; now do the actual patching.
 	CONST UINT32 Yes = 0xC301B0;	// mov al, 1, ret
 	CONST UINT32 No = 0xC3C033;		// xor eax, eax, ret
-	*((UINT32*)KeInitAmd64SpecificState) = No;
-	*((UINT32*)CcInitializeBcbProfiler) = Yes;
+	CopyWpMem(KeInitAmd64SpecificState, &No, sizeof(No));
+	CopyWpMem(CcInitializeBcbProfiler, &Yes, sizeof(Yes));
 	if (ExpLicenseWatchInitWorker != NULL)
-		*((UINT32*)ExpLicenseWatchInitWorker) = No;
+		CopyWpMem(ExpLicenseWatchInitWorker, &No, sizeof(No));
 	if (KiVerifyScopesExecute != NULL)
-		*(UINT32*)KiVerifyScopesExecute = No;
+		CopyWpMem(KiVerifyScopesExecute, &No, sizeof(No));
 	if (KiMcaDeferredRecoveryServiceCallers[0] != NULL && KiMcaDeferredRecoveryServiceCallers[1] != NULL)
 	{
-		*(UINT32*)KiMcaDeferredRecoveryServiceCallers[0] = No;
-		*(UINT32*)KiMcaDeferredRecoveryServiceCallers[1] = No;
+		CopyWpMem(KiMcaDeferredRecoveryServiceCallers[0], &No, sizeof(No));
+		CopyWpMem(KiMcaDeferredRecoveryServiceCallers[1], &No, sizeof(No));
 	}
 	if (KiSwInterruptPatternAddress != NULL)
-		SetMem(KiSwInterruptPatternAddress, sizeof(SigKiSwInterrupt), 0x90); // 11 x nop
+		SetWpMem(KiSwInterruptPatternAddress, sizeof(SigKiSwInterrupt), 0x90); // 11 x nop
 
 	// Print info
 	PRINT_KERNEL_PATCH_MSG(L"\r\n    Patched KeInitAmd64SpecificState [RVA: 0x%X].\r\n",
@@ -704,14 +704,20 @@ DisableDSE(
 	// We have all the addresses we need; now do the actual patching.
 	// SepInitializeCodeIntegrity is only patched when using the 'nuke option' DSE_DISABLE_AT_BOOT.
 	if (BypassType == DSE_DISABLE_AT_BOOT)
-		*((UINT16*)SepInitializeCodeIntegrityMovEcxAddress) = 0xC931;									// xor ecx, ecx
+	{
+		CONST UINT16 ZeroEcx = 0xC931;
+		CopyWpMem(SepInitializeCodeIntegrityMovEcxAddress, &ZeroEcx, sizeof(ZeroEcx));					// xor ecx, ecx
+	}
 
 	// SeValidateImageData *must* be patched on Windows Vista and 7 regardless of the DSE bypass method.
 	// On Windows >= 8, again require DSE_DISABLE_AT_BOOT to do anything as it is otherwise harmless.
 	if (BuildNumber < 9200)
-		*SeValidateImageDataJzAddress = 0xEB;															// jmp
+		SetWpMem(SeValidateImageDataJzAddress, sizeof(UINT8), 0xEB);									// jmp
 	else if (BypassType == DSE_DISABLE_AT_BOOT)
-		*(UINT32*)(SeValidateImageDataMovEaxAddress + 1 /*skip existing mov opcode*/) = 0x0;	// mov eax, 0
+	{
+		CONST UINT32 Zero = 0;
+		CopyWpMem(SeValidateImageDataMovEaxAddress + 1 /*skip existing mov*/, &Zero, sizeof(Zero));		// mov eax, 0
+	}
 
 	if (BuildNumber >= 16299 && BypassType == DSE_DISABLE_AT_BOOT)
 	{

@@ -24,6 +24,11 @@ CONST UINT8 gHookTemplate[] =
 	0x50,											// push [e|r]ax
 	0xC3											// ret
 };
+#if defined(MDE_CPU_X64)
+CONST UINTN gHookTemplateAddressOffset = 2;
+#elif defined(MDE_CPU_IA32)
+CONST UINTN gHookTemplateAddressOffset = 1;
+#endif
 
 
 // Signature for [bootmgfw|bootmgr]!ImgArch[Efi]StartBootApplication
@@ -49,7 +54,7 @@ HookedBootManagerImgArchStartBootApplication(
 	)
 {
 	// Restore the original function bytes that we replaced with our hook
-	CopyMem(OriginalFunction, OriginalFunctionBytes, sizeof(gHookTemplate));
+	CopyWpMem(OriginalFunction, OriginalFunctionBytes, sizeof(gHookTemplate));
 
 	// Clear the screen and paint it, paint it bl... green
 	CONST INT32 OriginalAttribute = SetConsoleTextColour(EFI_GREEN, TRUE);
@@ -325,8 +330,8 @@ PatchBootManager(
 	CopyMem(BackupAddress, (VOID*)OriginalAddress, sizeof(gHookTemplate));
 
 	// Place faux call (push addr, ret) at the start of the function to transfer execution to our hook
-	CopyMem((VOID*)OriginalAddress, gHookTemplate, sizeof(gHookTemplate));
-	*(UINTN*)((UINT8*)OriginalAddress + 2) = (UINTN)HookAddress;
+	CopyWpMem((VOID*)OriginalAddress, gHookTemplate, sizeof(gHookTemplate));
+	CopyWpMem((UINT8*)OriginalAddress + gHookTemplateAddressOffset, (UINTN*)&HookAddress, sizeof(UINTN));
 
 	gBS->RestoreTPL(Tpl);
 

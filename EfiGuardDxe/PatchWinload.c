@@ -128,7 +128,7 @@ HookedOslFwpKernelSetupPhase1(
 	)
 {
 	// Restore the original function bytes that we replaced with our hook
-	CopyMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gOslFwpKernelSetupPhase1Backup, sizeof(gOslFwpKernelSetupPhase1Backup));
+	CopyWpMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gOslFwpKernelSetupPhase1Backup, sizeof(gHookTemplate));
 
 	UINT8* LoadOrderListHeadAddress = (UINT8*)&LoaderBlock->LoadOrderListHead;
 	if (gKernelPatchInfo.BuildNumber < 7600)
@@ -238,7 +238,7 @@ PatchImgpValidateImageHash(
 	}
 
 	// Backtrack to function start
-	CONST UINT8* ImgpValidateImageHash = BacktrackToFunctionStart(ImageBase, NtHeaders, AndMinusFortyOneAddress);
+	UINT8* ImgpValidateImageHash = BacktrackToFunctionStart(ImageBase, NtHeaders, AndMinusFortyOneAddress);
 	if (ImgpValidateImageHash == NULL)
 	{
 		Print(L"    Failed to find %S!ImgpValidateImageHash%S.\r\n",
@@ -247,7 +247,8 @@ PatchImgpValidateImageHash(
 	}
 
 	// Apply the patch
-	*((UINT32*)ImgpValidateImageHash) = 0xC3C033; // xor eax, eax, ret
+	CONST UINT32 Ok = 0xC3C033; // xor eax, eax, ret
+	CopyWpMem(ImgpValidateImageHash, &Ok, sizeof(Ok));
 
 	// Print info
 	Print(L"    Patched %S!ImgpValidateImageHash [RVA: 0x%X].\r\n",
@@ -375,7 +376,7 @@ PatchImgpFilterValidationFailure(
 	}
 
 	// Backtrack to function start
-	CONST UINT8* ImgpFilterValidationFailure = BacktrackToFunctionStart(ImageBase, NtHeaders, LeaIntegrityFailureAddress);
+	UINT8* ImgpFilterValidationFailure = BacktrackToFunctionStart(ImageBase, NtHeaders, LeaIntegrityFailureAddress);
 	if (ImgpFilterValidationFailure == NULL)
 	{
 		Print(L"    Failed to find %S!ImgpFilterValidationFailure%S.\r\n",
@@ -384,7 +385,8 @@ PatchImgpFilterValidationFailure(
 	}
 
 	// Apply the patch
-	*((UINT32*)ImgpFilterValidationFailure) = 0xC3C033; // xor eax, eax, ret
+	CONST UINT32 Ok = 0xC3C033; // xor eax, eax, ret
+	CopyWpMem(ImgpFilterValidationFailure, &Ok, sizeof(Ok));
 
 	// Print info
 	Print(L"    Patched %S!ImgpFilterValidationFailure [RVA: 0x%X].\r\n\r\n",
@@ -679,16 +681,18 @@ PatchWinload(
 		goto Exit;
 	}
 
-	Print(L"HookedOslFwpKernelSetupPhase1 at 0x%p.\r\n", (VOID*)&HookedOslFwpKernelSetupPhase1);
+	CONST UINTN HookedOslFwpKernelSetupPhase1Address = (UINTN)&HookedOslFwpKernelSetupPhase1;
+	Print(L"HookedOslFwpKernelSetupPhase1 at 0x%p.\r\n", (VOID*)HookedOslFwpKernelSetupPhase1Address);
 
 	CONST EFI_TPL Tpl = gBS->RaiseTPL(TPL_HIGH_LEVEL); // Note: implies cli
 
 	// Backup original function prologue
-	CopyMem(gOslFwpKernelSetupPhase1Backup, (VOID*)gOriginalOslFwpKernelSetupPhase1, sizeof(gOslFwpKernelSetupPhase1Backup));
+	CopyMem(gOslFwpKernelSetupPhase1Backup, (VOID*)gOriginalOslFwpKernelSetupPhase1, sizeof(gHookTemplate));
 
 	// Place faux call (push addr, ret) at the start of the function to transfer execution to our hook
-	CopyMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gHookTemplate, sizeof(gHookTemplate));
-	*(UINTN*)((UINT8*)gOriginalOslFwpKernelSetupPhase1 + 2) = (UINTN)&HookedOslFwpKernelSetupPhase1;
+	CopyWpMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gHookTemplate, sizeof(gHookTemplate));
+	CopyWpMem((UINT8*)gOriginalOslFwpKernelSetupPhase1 + gHookTemplateAddressOffset,
+		(UINTN*)&HookedOslFwpKernelSetupPhase1Address, sizeof(HookedOslFwpKernelSetupPhase1Address));
 
 	gBS->RestoreTPL(Tpl);
 

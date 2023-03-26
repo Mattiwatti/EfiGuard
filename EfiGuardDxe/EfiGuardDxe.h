@@ -49,6 +49,7 @@ extern BOOLEAN gEfiGoneVirtual;
 // Universal template bytes for a faux call inline hook (mov [e|r]ax, <addr>, push [e|r]ax, ret)
 //
 extern CONST UINT8 gHookTemplate[(sizeof(VOID*) / 4) + sizeof(VOID*) + 2];
+extern CONST UINTN gHookTemplateAddressOffset;
 
 
 //
