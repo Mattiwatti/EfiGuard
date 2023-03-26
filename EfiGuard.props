@@ -57,7 +57,6 @@
       <EnableCOMDATFolding />
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <BaseAddress>0</BaseAddress>
-      <SectionAlignment>4096</SectionAlignment>
       <SetChecksum>true</SetChecksum>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <RandomizedBaseAddress />
@@ -68,7 +67,7 @@
       <UACExecutionLevel />
       <UACUIAccess />
       <TypeLibraryResourceID />
-      <AdditionalOptions>/SECTION:.xdata,D /SECTION:.pdata,D /OPT:ICF=10 /IGNORE:4254 /IGNORE:4281 /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/ALIGN:0x200 /FILEALIGN:0x200 /SECTION:.pdata,!D /SECTION:.xdata,!D /OPT:ICF=10 /IGNORE:4254 /IGNORE:4281 /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
       <MergeSections>.rdata=.text</MergeSections>
       <LinkErrorReporting />
       <ProfileGuidedDatabase />

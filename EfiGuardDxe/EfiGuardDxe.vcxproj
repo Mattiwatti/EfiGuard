@@ -33,7 +33,6 @@
     <Link>
       <AdditionalDependencies>UefiDriverEntryPoint.lib;BaseMemoryLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>EFI Runtime</SubSystem>
-      <SectionAlignment>4096</SectionAlignment>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
