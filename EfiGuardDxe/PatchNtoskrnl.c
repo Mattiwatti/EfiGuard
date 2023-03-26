@@ -138,45 +138,44 @@ DisablePatchGuard(
 	}
 
 	// Initialize Zydis
-	ZydisDecoder Decoder;
-	ZyanStatus Status = ZydisInit(NtHeaders, &Decoder, NULL);
+	ZYDIS_CONTEXT Context;
+	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
 	if (!ZYAN_SUCCESS(Status))
 	{
 		PRINT_KERNEL_PATCH_MSG(L"Failed to initialize disassembler engine.\r\n");
 		return EFI_LOAD_ERROR;
 	}
 
-	UINTN Length = SizeOfRawData;
-	UINTN Offset = 0;
-	ZyanU64 InstructionAddress;
-	ZydisDecodedInstruction Instruction;
+	Context.Length = SizeOfRawData;
+	Context.Offset = 0;
 
 	// Start decode loop
-	while ((InstructionAddress = (ZyanU64)(StartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	while ((Context.InstructionAddress = (ZyanU64)(StartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		if (BuildNumber < 9200)
 		{
 			// Windows Vista/7: check if this is 'call IMM'
-			if (Instruction.operand_count == 4 &&
-				Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Instruction.operands[0].imm.is_relative == ZYAN_TRUE &&
-				Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)
+			if (Context.Instruction.operand_count == 4 &&
+				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Context.Operands[0].imm.is_relative == ZYAN_TRUE &&
+				Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)
 			{
 				// Check if this is 'call RtlPcToFileHeader'
 				ZyanU64 OperandAddress = 0;
-				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
 					OperandAddress == RtlPcToFileHeader)
 				{
-					CcInitializeBcbProfilerPatternAddress = (UINT8*)InstructionAddress;
+					CcInitializeBcbProfilerPatternAddress = (UINT8*)Context.InstructionAddress;
 					PRINT_KERNEL_PATCH_MSG(L"    Found 'call RtlPcToFileHeader' at 0x%llX.\r\n", (UINTN)CcInitializeBcbProfilerPatternAddress);
 					break;
 				}
@@ -185,19 +184,19 @@ DisablePatchGuard(
 		else
 		{
 			// Windows 8+: check if this is 'mov [al|rax], 0x0FFFFF780000002D4' ; SharedUserData->KdDebuggerEnabled
-			if ((Instruction.operand_count == 2 && Instruction.mnemonic == ZYDIS_MNEMONIC_MOV && Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) &&
-				((Instruction.operands[0].reg.value == ZYDIS_REGISTER_AL && Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
-					(UINT64)(Instruction.operands[1].mem.disp.value) == 0x0FFFFF780000002D4ULL) ||
-				(Instruction.operands[0].reg.value == ZYDIS_REGISTER_RAX && Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
-					Instruction.operands[1].imm.value.u == 0x0FFFFF780000002D4ULL)))
+			if ((Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV && Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) &&
+				((Context.Operands[0].reg.value == ZYDIS_REGISTER_AL && Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
+					(UINT64)(Context.Operands[1].mem.disp.value) == 0x0FFFFF780000002D4ULL) ||
+				(Context.Operands[0].reg.value == ZYDIS_REGISTER_RAX && Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
+					Context.Operands[1].imm.value.u == 0x0FFFFF780000002D4ULL)))
 			{
-				CcInitializeBcbProfilerPatternAddress = (UINT8*)InstructionAddress;
+				CcInitializeBcbProfilerPatternAddress = (UINT8*)Context.InstructionAddress;
 				PRINT_KERNEL_PATCH_MSG(L"    Found CcInitializeBcbProfiler pattern at 0x%llX.\r\n", (UINTN)CcInitializeBcbProfilerPatternAddress);
 				break;
 			}
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	// Backtrack to function start
@@ -217,33 +216,34 @@ DisablePatchGuard(
 		UINT8* ExpLicenseWatchInitWorkerPatternAddress = NULL;
 
 		// Start decode loop
-		Offset = 0;
-		while ((InstructionAddress = (ZyanU64)(StartVa + Offset),
-				Status = ZydisDecoderDecodeBuffer(&Decoder,
-												(VOID*)InstructionAddress,
-												Length - Offset,
-												&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+		Context.Offset = 0;
+		while ((Context.InstructionAddress = (ZyanU64)(StartVa + Context.Offset),
+				Status = ZydisDecoderDecodeFull(&Context.Decoder,
+												(VOID*)Context.InstructionAddress,
+												Context.Length - Context.Offset,
+												&Context.Instruction,
+												Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 		{
 			if (!ZYAN_SUCCESS(Status))
 			{
-				Offset++;
+				Context.Offset++;
 				continue;
 			}
 
 			// Check if this is 'mov al, ds:[0x0FFFFF780000002D4]' ; SharedUserData->KdDebuggerEnabled
 			// The address must also obviously not be the CcInitializeBcbProfiler one we just found
-			if ((UINT8*)InstructionAddress != CcInitializeBcbProfilerPatternAddress &&
-				Instruction.operand_count == 2 && Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
-				Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Instruction.operands[0].reg.value == ZYDIS_REGISTER_AL &&
-				Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Instruction.operands[1].mem.segment == ZYDIS_REGISTER_DS &&
-				Instruction.operands[1].mem.disp.value == 0x0FFFFF780000002D4LL)
+			if ((UINT8*)Context.InstructionAddress != CcInitializeBcbProfilerPatternAddress &&
+				Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
+				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_AL &&
+				Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[1].mem.segment == ZYDIS_REGISTER_DS &&
+				Context.Operands[1].mem.disp.value == 0x0FFFFF780000002D4LL)
 			{
-				ExpLicenseWatchInitWorkerPatternAddress = (UINT8*)InstructionAddress;
+				ExpLicenseWatchInitWorkerPatternAddress = (UINT8*)Context.InstructionAddress;
 				PRINT_KERNEL_PATCH_MSG(L"    Found ExpLicenseWatchInitWorker pattern at 0x%llX.\r\n", (UINTN)ExpLicenseWatchInitWorkerPatternAddress);
 				break;
 			}
 
-			Offset += Instruction.length;
+			Context.Offset += Context.Instruction.length;
 		}
 
 		// Backtrack to function start
@@ -313,38 +313,39 @@ DisablePatchGuard(
 		}
 
 		// Start decode loop
-		Length = SizeOfRawData;
-		Offset = 0;
-		while ((InstructionAddress = (ZyanU64)(StartVa + Offset),
-				Status = ZydisDecoderDecodeBuffer(&Decoder,
-												(VOID*)InstructionAddress,
-												Length - Offset,
-												&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+		Context.Length = SizeOfRawData;
+		Context.Offset = 0;
+		while ((Context.InstructionAddress = (ZyanU64)(StartVa + Context.Offset),
+				Status = ZydisDecoderDecodeFull(&Context.Decoder,
+												(VOID*)Context.InstructionAddress,
+												Context.Length - Context.Offset,
+												&Context.Instruction,
+												Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 		{
 			if (!ZYAN_SUCCESS(Status))
 			{
-				Offset++;
+				Context.Offset++;
 				continue;
 			}
 
 			// Check if this is 'call KiMcaDeferredRecoveryService'
 			ZyanU64 OperandAddress = 0;	
-			if (Instruction.mnemonic == ZYDIS_MNEMONIC_CALL &&
-				ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+			if (Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL &&
+				ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
 				OperandAddress == (UINTN)KiMcaDeferredRecoveryService)
 			{
 				if (KiMcaDeferredRecoveryServiceCallers[0] == NULL)
 				{
-					KiMcaDeferredRecoveryServiceCallers[0] = (UINT8*)InstructionAddress;
+					KiMcaDeferredRecoveryServiceCallers[0] = (UINT8*)Context.InstructionAddress;
 				}
 				else if (KiMcaDeferredRecoveryServiceCallers[1] == NULL)
 				{
-					KiMcaDeferredRecoveryServiceCallers[1] = (UINT8*)InstructionAddress;
+					KiMcaDeferredRecoveryServiceCallers[1] = (UINT8*)Context.InstructionAddress;
 					break;
 				}
 			}
 
-			Offset += Instruction.length;
+			Context.Offset += Context.Instruction.length;
 		}
 
 		// Backtrack to function start
@@ -467,8 +468,8 @@ DisableDSE(
 	PRINT_KERNEL_PATCH_MSG(L"\r\n== Disassembling PAGE to find nt!SepInitializeCodeIntegrity 'mov ecx, xxx' ==\r\n");
 
 	// Initialize Zydis
-	ZydisDecoder Decoder;
-	ZyanStatus Status = ZydisInit(NtHeaders, &Decoder, NULL);
+	ZYDIS_CONTEXT Context;
+	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
 	if (!ZYAN_SUCCESS(Status))
 	{
 		PRINT_KERNEL_PATCH_MSG(L"Failed to initialize disassembler engine.\r\n");
@@ -476,9 +477,6 @@ DisableDSE(
 	}
 
 	UINT8* SepInitializeCodeIntegrityMovEcxAddress = NULL;
-	UINTN Length, Offset;
-	ZyanU64 InstructionAddress;
-	ZydisDecodedInstruction Instruction;
 
 	if (BuildNumber < 9200)
 	{
@@ -486,37 +484,38 @@ DisableDSE(
 		// SepInitializeCodeIntegrity will then call this thunk. What a waste
 		CONST PEFI_IMAGE_SECTION_HEADER TextSection = IMAGE_FIRST_SECTION(NtHeaders);
 		VOID* JmpCiInitializeAddress = NULL;
-		Length = TextSection->SizeOfRawData;
-		Offset = 0;
+		Context.Length = TextSection->SizeOfRawData;
+		Context.Offset = 0;
 
 		// Start decode loop
-		while ((InstructionAddress = (ZyanU64)(ImageBase + TextSection->VirtualAddress + Offset),
-				Status = ZydisDecoderDecodeBuffer(&Decoder,
-												(VOID*)InstructionAddress,
-												Length - Offset,
-												&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+		while ((Context.InstructionAddress = (ZyanU64)(ImageBase + TextSection->VirtualAddress + Context.Offset),
+				Status = ZydisDecoderDecodeFull(&Context.Decoder,
+												(VOID*)Context.InstructionAddress,
+												Context.Length - Context.Offset,
+												&Context.Instruction,
+												Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 		{
 			if (!ZYAN_SUCCESS(Status))
 			{
-				Offset++;
+				Context.Offset++;
 				continue;
 			}
 
-			if ((Instruction.operand_count == 2 &&
-				Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Instruction.operands[0].mem.base == ZYDIS_REGISTER_RIP) &&
-				Instruction.mnemonic == ZYDIS_MNEMONIC_JMP)
+			if ((Context.Instruction.operand_count == 2 &&
+				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[0].mem.base == ZYDIS_REGISTER_RIP) &&
+				Context.Instruction.mnemonic == ZYDIS_MNEMONIC_JMP)
 			{
 				// Check if this is 'jmp qword ptr ds:[CiInitialize IAT RVA]'
 				ZyanU64 OperandAddress = 0;
-				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
 					OperandAddress == (UINTN)CiInitialize)
 				{
-					JmpCiInitializeAddress = (VOID*)InstructionAddress;
+					JmpCiInitializeAddress = (VOID*)Context.InstructionAddress;
 					break;
 				}
 			}
 
-			Offset += Instruction.length;
+			Context.Offset += Context.Instruction.length;
 		}
 
 		if (JmpCiInitializeAddress == NULL)
@@ -530,38 +529,39 @@ DisableDSE(
 	}
 
 	UINT8* LastMovIntoEcx = NULL; // Keep track of 'mov ecx, xxx' - the last one before call/jmp cs:__imp_CiInitialize is the one we want to patch
-	Length = PageSizeOfRawData;
-	Offset = 0;
+	Context.Length = PageSizeOfRawData;
+	Context.Offset = 0;
 
 	// Start decode loop
-	while ((InstructionAddress = (ZyanU64)(PageStartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	while ((Context.InstructionAddress = (ZyanU64)(PageStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		// Check if this is a 2-byte (size of our patch) 'mov ecx, <anything>' and store the instruction address if so
-		if (Instruction.operand_count == 2 && Instruction.length == 2 && Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
-			Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Instruction.operands[0].reg.value == ZYDIS_REGISTER_ECX)
+		if (Context.Instruction.operand_count == 2 && Context.Instruction.length == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
+			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_ECX)
 		{
-			LastMovIntoEcx = (UINT8*)InstructionAddress;
+			LastMovIntoEcx = (UINT8*)Context.InstructionAddress;
 		}
 		else if ((BuildNumber >= 9200 &&
-				((Instruction.operand_count == 2 || Instruction.operand_count == 4) &&
-				(Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Instruction.operands[0].mem.base == ZYDIS_REGISTER_RIP) &&
-				((Instruction.mnemonic == ZYDIS_MNEMONIC_JMP && Instruction.operand_count == 2) ||
-				(Instruction.mnemonic == ZYDIS_MNEMONIC_CALL && Instruction.operand_count == 4))))
+				((Context.Instruction.operand_count == 2 || Context.Instruction.operand_count == 4) &&
+				(Context.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[0].mem.base == ZYDIS_REGISTER_RIP) &&
+				((Context.Instruction.mnemonic == ZYDIS_MNEMONIC_JMP && Context.Instruction.operand_count == 2) ||
+				(Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL && Context.Instruction.operand_count == 4))))
 			||
 			(BuildNumber < 9200 &&
-				(Instruction.operand_count == 4 &&
-				Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Instruction.operands[0].imm.is_relative == ZYAN_TRUE &&
-				Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)))
+				(Context.Instruction.operand_count == 4 &&
+				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Context.Operands[0].imm.is_relative == ZYAN_TRUE &&
+				Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)))
 		{
 			// Check if this is
 			// 'call IMM:CiInitialize thunk'				// E8 ?? ?? ?? ??			// Windows Vista/7
@@ -570,7 +570,7 @@ DisableDSE(
 			// or
 			// 'call qword ptr ds:[CiInitialize IAT RVA]'	// FF 15 ?? ?? ?? ??		// Windows 10.0.16299.0+
 			ZyanU64 OperandAddress = 0;
-			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
 				OperandAddress == (UINTN)CiInitialize)
 			{
 				SepInitializeCodeIntegrityMovEcxAddress = LastMovIntoEcx; // The last 'mov ecx, xxx' before the call/jmp is the instruction we want
@@ -580,7 +580,7 @@ DisableDSE(
 			}
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	if (SepInitializeCodeIntegrityMovEcxAddress == NULL)
@@ -593,35 +593,36 @@ DisableDSE(
 	if (BuildNumber < 9200)
 	{
 		// On Windows Vista/7, find g_CiEnabled now because it's a few bytes away and we'll it need later
-		Length = 32;
-		Offset = 0;
+		Context.Length = 32;
+		Context.Offset = 0;
 
-		while ((InstructionAddress = (ZyanU64)(SepInitializeCodeIntegrityMovEcxAddress + Offset),
-				Status = ZydisDecoderDecodeBuffer(&Decoder,
-												(VOID*)InstructionAddress,
-												Length - Offset,
-												&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+		while ((Context.InstructionAddress = (ZyanU64)(SepInitializeCodeIntegrityMovEcxAddress + Context.Offset),
+				Status = ZydisDecoderDecodeFull(&Context.Decoder,
+												(VOID*)Context.InstructionAddress,
+												Context.Length - Context.Offset,
+												&Context.Instruction,
+												Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 		{
 			if (!ZYAN_SUCCESS(Status))
 			{
-				Offset++;
+				Context.Offset++;
 				continue;
 			}
 
 			// Check if this is 'mov g_CiEnabled, REG8'
-			if (Instruction.operand_count == 2 &&
-				Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
-				Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Instruction.operands[0].mem.base == ZYDIS_REGISTER_RIP &&
-				Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER)
+			if (Context.Instruction.operand_count == 2 &&
+				Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
+				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[0].mem.base == ZYDIS_REGISTER_RIP &&
+				Context.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER)
 			{
-				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &gCiEnabled)))
+				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &gCiEnabled)))
 				{
 					PRINT_KERNEL_PATCH_MSG(L"    Found g_CiEnabled at 0x%llX.\r\n", gCiEnabled);
 					break;
 				}
 			}
 
-			Offset += Instruction.length;
+			Context.Offset += Context.Instruction.length;
 		}
 
 		if (gCiEnabled == 0)
@@ -636,30 +637,31 @@ DisableDSE(
 	UINT8 *SeValidateImageDataMovEaxAddress = NULL, *SeValidateImageDataJzAddress = NULL;
 
 	// Start decode loop
-	Length = PageSizeOfRawData;
-	Offset = 0;
-	while ((InstructionAddress = (ZyanU64)(PageStartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	Context.Length = PageSizeOfRawData;
+	Context.Offset = 0;
+	while ((Context.InstructionAddress = (ZyanU64)(PageStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		// On Windows >= 8, check if this is 'mov eax, 0xC0000428' (STATUS_INVALID_IMAGE_HASH) in SeValidateImageData
 		if ((BuildNumber >= 9200 &&
-			(Instruction.operand_count == 2 && Instruction.mnemonic == ZYDIS_MNEMONIC_MOV) &&
-			(Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Instruction.operands[0].reg.value == ZYDIS_REGISTER_EAX) &&
-			Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Instruction.operands[1].imm.value.s == 0xc0000428LL))
+			(Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV) &&
+			(Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_EAX) &&
+			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && (Context.Operands[1].imm.value.s & 0xFFFFFFFFLL) == 0xc0000428LL))
 		{
 			// Exclude false positives: next instruction must be jmp rel32 (Win 8), jmp rel8 (Win 8.1/10) or ret
-			CONST UINT8* Address = (UINT8*)InstructionAddress;
+			CONST UINT8* Address = (UINT8*)Context.InstructionAddress;
 			CONST UINT8 JmpOpcode = BuildNumber >= 9600 ? 0xEB : 0xE9;
-			if (*(Address + Instruction.length) == JmpOpcode || *(Address + Instruction.length) == 0xC3)
+			if (*(Address + Context.Instruction.length) == JmpOpcode || *(Address + Context.Instruction.length) == 0xC3)
 			{
 				SeValidateImageDataMovEaxAddress = (UINT8*)Address;
 				PRINT_KERNEL_PATCH_MSG(L"    Found 'mov eax, 0xC0000428' in SeValidateImageData [RVA: 0x%X].\r\n",
@@ -669,19 +671,19 @@ DisableDSE(
 		}
 		// On Windows Vista/7, check if this is 'cmp g_CiEnabled, al' in SeValidateImageData
 		else if (BuildNumber < 9200 &&
-			(Instruction.operand_count == 3 && Instruction.mnemonic == ZYDIS_MNEMONIC_CMP) &&
-			(Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Instruction.operands[0].mem.base == ZYDIS_REGISTER_RIP) &&
-			(Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER && Instruction.operands[1].reg.value == ZYDIS_REGISTER_AL))
+			(Context.Instruction.operand_count == 3 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CMP) &&
+			(Context.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[0].mem.base == ZYDIS_REGISTER_RIP) &&
+			(Context.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[1].reg.value == ZYDIS_REGISTER_AL))
 		{
 			ZyanU64 OperandAddress = 0;
-			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
 				OperandAddress == gCiEnabled)
 			{
 				// Verify the next instruction is jz, and store its address instead of the cmp, as we will be patching the jz
-				CONST UINT8* Address = (UINT8*)InstructionAddress;
-				if (*(Address + Instruction.length) == 0x74)
+				CONST UINT8* Address = (UINT8*)Context.InstructionAddress;
+				if (*(Address + Context.Instruction.length) == 0x74)
 				{
-					SeValidateImageDataJzAddress = (UINT8*)(Address + Instruction.length);
+					SeValidateImageDataJzAddress = (UINT8*)(Address + Context.Instruction.length);
 					PRINT_KERNEL_PATCH_MSG(L"    Found 'cmp g_CiEnabled, al' in SeValidateImageData [RVA: 0x%X].\r\n",
 						(UINT32)(Address - ImageBase));
 					break;
@@ -689,7 +691,7 @@ DisableDSE(
 			}
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	if (SeValidateImageDataMovEaxAddress == NULL && SeValidateImageDataJzAddress == NULL)

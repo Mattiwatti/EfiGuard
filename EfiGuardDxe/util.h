@@ -1,8 +1,10 @@
 #pragma once
 
-#include "EfiGuardDxe.h"
-
 #include <Protocol/LoadedImage.h>
+
+#ifndef ZYDIS_DISABLE_FORMATTER
+#include <Zydis/Formatter.h>
+#endif
 
 //
 // Stalls CPU for N milliseconds
@@ -105,19 +107,33 @@ FindPatternVerbose(
 	OUT VOID **Found
 	);
 
-typedef struct ZydisFormatter_ ZydisFormatter;
+//
+// Zydis instruction decoder context.
+//
+typedef struct _ZYDIS_CONTEXT
+{
+	ZydisDecoder Decoder;
+	ZydisDecodedInstruction Instruction;
+	ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT];
+
+	ZyanU64 InstructionAddress;
+	UINTN Length;
+	UINTN Offset;
+
+#ifndef ZYDIS_DISABLE_FORMATTER
+	ZydisFormatter Formatter;
+	CHAR8 InstructionText[256];
+#endif
+} ZYDIS_CONTEXT, *PZYDIS_CONTEXT;
 
 //
-// Initializes a ZydisDecoder instance.
-// If ZYDIS_DISABLE_FORMATTER is defined, Formatter must be NULL.
-// Otherwise it is a required argument.
+// Initializes a decoder context.
 //
 ZyanStatus
 EFIAPI
 ZydisInit(
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
-	OUT ZydisDecoder *Decoder,
-	OUT ZydisFormatter *Formatter OPTIONAL
+	OUT PZYDIS_CONTEXT Context
 	);
 
 //

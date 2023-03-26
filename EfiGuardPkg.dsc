@@ -83,11 +83,6 @@
   INTEL:*_*_*_CC_FLAGS = /utf-8
   GCC:*_*_*_CC_FLAGS = -finput-charset=UTF-8
 
-  # ICC generates about a million of these for Zydis on /W4, and then quits because of /WX.
-  # warning #188: enumerated type mixed with another type
-  # message #2415: variable "x" of static storage duration was declared but never referenced
-  INTEL:*_*_*_CC_FLAGS = /wd188,2415
-
   # Pre-emptive strike for when this horrible option inevitably becomes the default
   MSFT:*_*_*_CC_FLAGS = /Qspectre-
 

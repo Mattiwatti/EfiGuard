@@ -337,26 +337,23 @@ ZyanStatus
 EFIAPI
 ZydisInit(
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
-	OUT ZydisDecoder *Decoder,
-	OUT ZydisFormatter *Formatter OPTIONAL
+	OUT PZYDIS_CONTEXT Context
 	)
 {
 	ZyanStatus Status;
-	if (!ZYAN_SUCCESS((Status = ZydisDecoderInit(Decoder,
+	if (!ZYAN_SUCCESS((Status = ZydisDecoderInit(&Context->Decoder,
 										IMAGE64(NtHeaders) ? ZYDIS_MACHINE_MODE_LONG_64 : ZYDIS_MACHINE_MODE_LONG_COMPAT_32,
-										IMAGE64(NtHeaders) ? ZYDIS_ADDRESS_WIDTH_64 : ZYDIS_ADDRESS_WIDTH_32))))
+										IMAGE64(NtHeaders) ? ZYDIS_STACK_WIDTH_64 : ZYDIS_STACK_WIDTH_32))))
 		return Status;
 
-#ifdef ZYDIS_DISABLE_FORMATTER
-	ASSERT(Formatter == NULL);
-#else
-	if (!ZYAN_SUCCESS((Status = ZydisFormatterInit(Formatter, ZYDIS_FORMATTER_STYLE_INTEL))))
+#ifndef ZYDIS_DISABLE_FORMATTER
+	if (!ZYAN_SUCCESS((Status = ZydisFormatterInit(&Context->Formatter, ZYDIS_FORMATTER_STYLE_INTEL))))
 		return Status;
-	if (!ZYAN_SUCCESS((Status = ZydisFormatterSetProperty(Formatter, ZYDIS_FORMATTER_PROP_FORCE_SIZE, ZYAN_TRUE))))
+	if (!ZYAN_SUCCESS((Status = ZydisFormatterSetProperty(&Context->Formatter, ZYDIS_FORMATTER_PROP_FORCE_SIZE, ZYAN_TRUE))))
 		return Status;
 
-	DefaultInstructionFormatter = (ZydisFormatterFunc)&ZydisInstructionBytesFormatter;
-	if (!ZYAN_SUCCESS((Status = ZydisFormatterSetHook(Formatter,
+	DefaultInstructionFormatter = &ZydisInstructionBytesFormatter;
+	if (!ZYAN_SUCCESS((Status = ZydisFormatterSetHook(&Context->Formatter,
 													ZYDIS_FORMATTER_FUNC_FORMAT_INSTRUCTION,
 													(CONST VOID**)&DefaultInstructionFormatter))))
 		return Status;

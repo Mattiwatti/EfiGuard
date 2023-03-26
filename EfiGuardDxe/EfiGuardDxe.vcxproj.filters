@@ -44,10 +44,16 @@
     <ClCompile Include="PatchNtoskrnl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VisualUefi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Zydis\src\Decoder.c">
       <Filter>Source Files\Zydis</Filter>
     </ClCompile>
     <ClCompile Include="Zydis\src\DecoderData.c">
+      <Filter>Source Files\Zydis</Filter>
+    </ClCompile>
+    <ClCompile Include="Zydis\src\Disassembler.c">
       <Filter>Source Files\Zydis</Filter>
     </ClCompile>
     <ClCompile Include="Zydis\src\Formatter.c">
@@ -74,6 +80,9 @@
     <ClCompile Include="Zydis\src\Register.c">
       <Filter>Source Files\Zydis</Filter>
     </ClCompile>
+    <ClCompile Include="Zydis\src\Segment.c">
+      <Filter>Source Files\Zydis</Filter>
+    </ClCompile>
     <ClCompile Include="Zydis\src\SharedData.c">
       <Filter>Source Files\Zydis</Filter>
     </ClCompile>
@@ -85,9 +94,6 @@
     </ClCompile>
     <ClCompile Include="Zydis\src\Zydis.c">
       <Filter>Source Files\Zydis</Filter>
-    </ClCompile>
-    <ClCompile Include="VisualUefi.c">
-      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -103,7 +109,19 @@
     <ClInclude Include="util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\Include\Protocol\EfiGuard.h">
+      <Filter>Header Files\Protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="ntdef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Allocator.h">
+      <Filter>Header Files\Zydis\Zycore</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\ArgParse.h">
+      <Filter>Header Files\Zydis\Zycore</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Atomic.h">
       <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Bitset.h">
@@ -121,6 +139,9 @@
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\LibC.h">
       <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\List.h">
+      <Filter>Header Files\Zydis\Zycore</Filter>
+    </ClInclude>
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Object.h">
       <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
@@ -130,47 +151,14 @@
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\String.h">
       <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
-    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Terminal.h">
-      <Filter>Header Files\Zydis\Zycore</Filter>
-    </ClInclude>
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Types.h">
       <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
     <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Vector.h">
       <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Decoder.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\DecoderTypes.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Formatter.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\MetaInfo.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Mnemonic.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Register.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\SharedTypes.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\ShortString.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Status.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Utils.h">
-      <Filter>Header Files\Zydis</Filter>
-    </ClInclude>
-    <ClInclude Include="Zydis\include\Zydis\Zydis.h">
-      <Filter>Header Files\Zydis</Filter>
+    <ClInclude Include="Zydis\dependencies\zycore\include\Zycore\Zycore.h">
+      <Filter>Header Files\Zydis\Zycore</Filter>
     </ClInclude>
     <ClInclude Include="Zydis\include\Zydis\Internal\DecoderData.h">
       <Filter>Header Files\Zydis\Internal</Filter>
@@ -190,11 +178,50 @@
     <ClInclude Include="Zydis\include\Zydis\Internal\String.h">
       <Filter>Header Files\Zydis\Internal</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\Protocol\EfiGuard.h">
-      <Filter>Header Files\Protocol</Filter>
+    <ClInclude Include="Zydis\include\Zydis\Decoder.h">
+      <Filter>Header Files\Zydis</Filter>
     </ClInclude>
-    <ClInclude Include="ntdef.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="Zydis\include\Zydis\DecoderTypes.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Defines.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Disassembler.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Formatter.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\FormatterBuffer.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\MetaInfo.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Mnemonic.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Register.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Segment.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\SharedTypes.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\ShortString.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Status.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Utils.h">
+      <Filter>Header Files\Zydis</Filter>
+    </ClInclude>
+    <ClInclude Include="Zydis\include\Zydis\Zydis.h">
+      <Filter>Header Files\Zydis</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

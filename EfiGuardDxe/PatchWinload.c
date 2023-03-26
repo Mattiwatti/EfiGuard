@@ -196,46 +196,45 @@ PatchImgpValidateImageHash(
 	UINT8* AndMinusFortyOneAddress = NULL;
 
 	// Initialize Zydis
-	ZydisDecoder Decoder;
-	ZyanStatus Status = ZydisInit(NtHeaders, &Decoder, NULL);
+	ZYDIS_CONTEXT Context;
+	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
 	if (!ZYAN_SUCCESS(Status))
 	{
 		Print(L"Failed to initialize disassembler engine.\r\n");
 		return EFI_LOAD_ERROR;
 	}
 
-	CONST UINTN Length = CodeSizeOfRawData;
-	UINTN Offset = 0;
-	ZyanU64 InstructionAddress;
-	ZydisDecodedInstruction Instruction;
+	Context.Length = CodeSizeOfRawData;
+	Context.Offset = 0;
 
 	// Start decode loop
-	while ((InstructionAddress = (ZyanU64)(CodeStartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	while ((Context.InstructionAddress = (ZyanU64)(CodeStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		// Check if this is 'and REG32, 0FFFFFFD7h' (only esi and r8d are used here really)
-		if (Instruction.operand_count == 3 &&
-			(Instruction.length == 3 || Instruction.length == 4) &&
-			Instruction.mnemonic == ZYDIS_MNEMONIC_AND &&
-			Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
-			Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
-			Instruction.operands[1].imm.is_signed == ZYAN_TRUE &&
-			Instruction.operands[1].imm.value.s == (ZyanI64)((ZyanI32)0xFFFFFFD7)) // Sign extend to 64 bits
+		if (Context.Instruction.operand_count == 3 &&
+			(Context.Instruction.length == 3 || Context.Instruction.length == 4) &&
+			Context.Instruction.mnemonic == ZYDIS_MNEMONIC_AND &&
+			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
+			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
+			Context.Operands[1].imm.is_signed == ZYAN_TRUE &&
+			Context.Operands[1].imm.value.s == (ZyanI64)((ZyanI32)0xFFFFFFD7)) // Sign extend to 64 bits
 		{
-			AndMinusFortyOneAddress = (UINT8*)InstructionAddress;
+			AndMinusFortyOneAddress = (UINT8*)Context.InstructionAddress;
 			break;
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	// Backtrack to function start
@@ -332,48 +331,47 @@ PatchImgpFilterValidationFailure(
 	UINT8* LeaIntegrityFailureAddress = NULL;
 
 	// Initialize Zydis
-	ZydisDecoder Decoder;
-	ZyanStatus Status = ZydisInit(NtHeaders, &Decoder, NULL);
+	ZYDIS_CONTEXT Context;
+	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
 	if (!ZYAN_SUCCESS(Status))
 	{
 		Print(L"Failed to initialize disassembler engine.\r\n");
 		return EFI_LOAD_ERROR;
 	}
 
-	CONST UINTN Length = CodeSizeOfRawData;
-	UINTN Offset = 0;
-	ZyanU64 InstructionAddress;
-	ZydisDecodedInstruction Instruction;
+	Context.Length = CodeSizeOfRawData;
+	Context.Offset = 0;
 
 	// Start decode loop
-	while ((InstructionAddress = (ZyanU64)(CodeStartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	while ((Context.InstructionAddress = (ZyanU64)(CodeStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		// Check if this is "lea REG, ds:[rip + offset_to_bsod_string]"
-		if (Instruction.operand_count == 2 && Instruction.mnemonic == ZYDIS_MNEMONIC_LEA &&
-			Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
-			Instruction.operands[1].mem.base == ZYDIS_REGISTER_RIP)
+		if (Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_LEA &&
+			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
+			Context.Operands[1].mem.base == ZYDIS_REGISTER_RIP)
 		{
 			ZyanU64 OperandAddress = 0;
-			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[1], InstructionAddress, &OperandAddress)) &&
+			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, &OperandAddress)) &&
 				OperandAddress == (UINTN)IntegrityFailureStringAddress)
 			{
-				LeaIntegrityFailureAddress = (UINT8*)InstructionAddress;
+				LeaIntegrityFailureAddress = (UINT8*)Context.InstructionAddress;
 				Print(L"    Found load instruction for load failure string at 0x%llx.\r\n", (UINTN)LeaIntegrityFailureAddress);
 				break;
 			}
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	// Backtrack to function start
@@ -470,55 +468,54 @@ FindOslFwpKernelSetupPhase1(
 	UINT8* LeaEfiAcpiTableGuidAddress = NULL;
 
 	// Initialize Zydis
-	ZydisDecoder Decoder;
-	ZyanStatus Status = ZydisInit(NtHeaders, &Decoder, NULL);
+	ZYDIS_CONTEXT Context;
+	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
 	if (!ZYAN_SUCCESS(Status))
 	{
 		Print(L"Failed to initialize disassembler engine.\r\n");
 		return EFI_LOAD_ERROR;
 	}
 
-	CONST UINTN Length = CodeSizeOfRawData;
-	UINTN Offset = 0;
-	ZyanU64 InstructionAddress;
-	ZydisDecodedInstruction Instruction;
+	Context.Length = CodeSizeOfRawData;
+	Context.Offset = 0;
 
 	// Start decode loop
-	while ((InstructionAddress = (ZyanU64)(CodeStartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	while ((Context.InstructionAddress = (ZyanU64)(CodeStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		// Check if this is "lea rcx, ds:[rip + offset_to_acpi20_guid]"
-		if (Instruction.operand_count == 2 && Instruction.mnemonic == ZYDIS_MNEMONIC_LEA &&
-			Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
-			Instruction.operands[0].reg.value == ZYDIS_REGISTER_RCX &&
-			Instruction.operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
-			Instruction.operands[1].mem.base == ZYDIS_REGISTER_RIP)
+		if (Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_LEA &&
+			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
+			Context.Operands[0].reg.value == ZYDIS_REGISTER_RCX &&
+			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
+			Context.Operands[1].mem.base == ZYDIS_REGISTER_RIP)
 		{
 			ZyanU64 OperandAddress = 0;
-			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[1], InstructionAddress, &OperandAddress)) &&
+			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, &OperandAddress)) &&
 				OperandAddress == (UINTN)PatternAddress)
 			{
 				// Check for false positives (BlFwGetSystemTable)
-				CONST UINT8* Check = (UINT8*)(CodeStartVa + Offset - 4); // 4 = length of 'lea rdx, [r11+18h]' which precedes this instruction in EfipGetRsdt
+				CONST UINT8* Check = (UINT8*)(CodeStartVa + Context.Offset - 4); // 4 = length of 'lea rdx, [r11+18h]' which precedes this instruction in EfipGetRsdt
 				if (Check[0] == 0x49 && Check[1] == 0x8D && Check[2] == 0x53) // If no match, this is not EfipGetRsdt
 				{
-					LeaEfiAcpiTableGuidAddress = (UINT8*)InstructionAddress;
+					LeaEfiAcpiTableGuidAddress = (UINT8*)Context.InstructionAddress;
 					Print(L"    Found load instruction for EFI ACPI 2.0 GUID at 0x%llX.\r\n", (UINTN)LeaEfiAcpiTableGuidAddress);
 					break;
 				}
 			}
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	if (LeaEfiAcpiTableGuidAddress == NULL)
@@ -539,42 +536,43 @@ FindOslFwpKernelSetupPhase1(
 	UINT8* CallEfipGetRsdtAddress = NULL;
 
 	// Start decode loop
-	Offset = 0;
+	Context.Offset = 0;
 	UINTN ShortestDistanceToCall = MAX_UINTN;
-	while ((InstructionAddress = (ZyanU64)(CodeStartVa + Offset),
-			Status = ZydisDecoderDecodeBuffer(&Decoder,
-											(VOID*)InstructionAddress,
-											Length - Offset,
-											&Instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
+	while ((Context.InstructionAddress = (ZyanU64)(CodeStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
 	{
 		if (!ZYAN_SUCCESS(Status))
 		{
-			Offset++;
+			Context.Offset++;
 			continue;
 		}
 
 		// Check if this is 'call IMM'
-		if (Instruction.operand_count == 4 &&
-			Instruction.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Instruction.operands[0].imm.is_relative == ZYAN_TRUE &&
-			Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)
+		if (Context.Instruction.operand_count == 4 &&
+			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Context.Operands[0].imm.is_relative == ZYAN_TRUE &&
+			Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)
 		{
 			// Check if this is 'call EfipGetRsdt'
 			ZyanU64 OperandAddress = 0;
-			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Instruction.operands[0], InstructionAddress, &OperandAddress)) &&
+			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
 				OperandAddress == (UINTN)EfipGetRsdt)
 			{
 				// Calculate the distance from the start of the function to the instruction. OslFwpKernelSetupPhase1 will always have the shortest distance
-				CONST UINTN StartOfFunction = (UINTN)BacktrackToFunctionStart(ImageBase, NtHeaders, (UINT8*)InstructionAddress);
-				CONST UINTN Distance = InstructionAddress - StartOfFunction;
+				CONST UINTN StartOfFunction = (UINTN)BacktrackToFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress);
+				CONST UINTN Distance = Context.InstructionAddress - StartOfFunction;
 				if (Distance < ShortestDistanceToCall)
 				{
-					CallEfipGetRsdtAddress = (UINT8*)InstructionAddress;
+					CallEfipGetRsdtAddress = (UINT8*)Context.InstructionAddress;
 					ShortestDistanceToCall = Distance;
 				}
 			}
 		}
 
-		Offset += Instruction.length;
+		Context.Offset += Context.Instruction.length;
 	}
 
 	if (CallEfipGetRsdtAddress == NULL)

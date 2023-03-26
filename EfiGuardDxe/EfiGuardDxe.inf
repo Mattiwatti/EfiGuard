@@ -20,6 +20,7 @@
   Zydis/src/MetaInfo.c
   Zydis/src/Mnemonic.c
   Zydis/src/Register.c
+  Zydis/src/Segment.c
   Zydis/src/SharedData.c
   Zydis/src/String.c
   Zydis/src/Utils.c
@@ -29,8 +30,6 @@
   MdePkg/MdePkg.dec
   EfiGuardPkg/EfiGuardPkg.dec
   MdeModulePkg/MdeModulePkg.dec
-  # In EDK2 releases older than UDK2017, gEfiShellProtocolGuid is not in MdePkg but in ShellPkg.
-  # ShellPkg/ShellPkg.dec
 
 [LibraryClasses]
   UefiDriverEntryPoint
@@ -69,7 +68,15 @@
 
 [BuildOptions.Common]
   # Put Zydis on a diet
-  *_*_*_CC_FLAGS = -D ZYAN_UEFI -D ZYAN_NO_LIBC -D ZYCORE_STATIC_DEFINE -D ZYDIS_STATIC_DEFINE -D ZYDIS_DISABLE_AVX512 -D ZYDIS_DISABLE_KNC -D ZYDIS_DISABLE_FORMATTER
+  *_*_*_CC_FLAGS = -D ZYAN_NO_LIBC -D ZYCORE_STATIC_BUILD -D ZYDIS_STATIC_BUILD -D ZYDIS_DISABLE_ENCODER -D ZYDIS_DISABLE_FORMATTER -D ZYDIS_DISABLE_AVX512 -D ZYDIS_DISABLE_KNC
+
+  # Zydis triggers this with MSVC and ICC on /W4.
+  # warning C4201: nonstandard extension used: nameless struct/union
+  MSFT:*_*_*_CC_FLAGS = /wd4201
+  # ICC additionally generates about a million of these for Zydis on /W4, and then quits because of /WX.
+  # warning #188: enumerated type mixed with another type
+  # message #2415: variable "x" of static storage duration was declared but never referenced
+  INTEL:*_*_*_CC_FLAGS = -wd4201,188,2415
 
   # This makes the decoder about twice as fast... sorry about the extra 5KB. Oh and usable PDBs please
   MSFT:RELEASE_*_*_CC_FLAGS = /O2 /Ot /Zi
