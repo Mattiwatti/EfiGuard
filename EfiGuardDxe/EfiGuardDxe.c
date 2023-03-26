@@ -104,6 +104,10 @@ SetServicePointer(
 	ASSERT(gBS->CalculateCrc32 != NULL);
 
 	CONST EFI_TPL Tpl = gBS->RaiseTPL(TPL_HIGH_LEVEL); // Note: implies cli
+	CONST UINTN Cr0 = AsmReadCr0();
+	CONST BOOLEAN WpSet = (Cr0 & CR0_WP) != 0;
+	if (WpSet)
+		AsmWriteCr0(Cr0 & ~CR0_WP);
 
 	VOID* OriginalFunction = InterlockedCompareExchangePointer(ServiceTableFunction,
 																*ServiceTableFunction,
@@ -113,6 +117,8 @@ SetServicePointer(
 	ServiceTableHeader->CRC32 = 0;
 	gBS->CalculateCrc32((UINT8*)ServiceTableHeader, ServiceTableHeader->HeaderSize, &ServiceTableHeader->CRC32);
 
+	if (WpSet)
+		AsmWriteCr0(Cr0);
 	gBS->RestoreTPL(Tpl);
 
 	return OriginalFunction;
@@ -631,11 +637,6 @@ EfiGuardInitialize(
 	SetMem64(gKernelPatchInfo.Buffer, sizeof(gKernelPatchInfo.Buffer), 0ULL);
 	gKernelPatchInfo.BuildNumber = 0;
 	gKernelPatchInfo.KernelBase = NULL;
-
-	// Wipe our image info and PE headers
-	LocalImageInfo->DeviceHandle = LocalImageInfo->FilePath = LocalImageInfo->ParentHandle = NULL;
-	CONST PEFI_IMAGE_NT_HEADERS NtHeaders = RtlpImageNtHeaderEx(LocalImageInfo->ImageBase, LocalImageInfo->ImageSize);
-	ZeroMem(LocalImageInfo->ImageBase, NtHeaders->OptionalHeader.SizeOfHeaders);
 
 	// The ASCII banner is very pretty - ensure the user has enough time to admire it
 	RtlSleep(1500);

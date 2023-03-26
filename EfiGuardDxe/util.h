@@ -6,6 +6,9 @@
 #include <Zydis/Formatter.h>
 #endif
 
+#define CR0_WP		((UINTN)0x10000) // CR0.WP
+
+
 //
 // Stalls CPU for N milliseconds
 //
@@ -45,6 +48,28 @@ VOID
 EFIAPI
 PrintKernelPatchInfo(
 	VOID
+	);
+
+//
+// Wrapper for CopyMem() that disables write protection prior to copying if needed.
+//
+VOID*
+EFIAPI
+CopyWpMem(
+	OUT VOID *Destination,
+	IN CONST VOID *Source,
+	IN UINTN Length
+	);
+
+//
+// Wrapper for SetMem() that disables write protection prior to copying if needed.
+//
+VOID*
+EFIAPI
+SetWpMem(
+	OUT VOID *Destination,
+	IN UINTN Length,
+	IN UINT8 Value
 	);
 
 //

@@ -2,6 +2,7 @@
 #include "util.h"
 
 #include <Library/UefiLib.h>
+#include <Library/BaseMemoryLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/PrintLib.h>
 #include <Library/UefiBootServicesTableLib.h>
@@ -97,6 +98,48 @@ PrintKernelPatchInfo(
 		gST->ConOut->OutputString(gST->ConOut, String);
 		String += Length + 1;
 	}
+}
+
+VOID*
+EFIAPI
+CopyWpMem(
+	OUT VOID *Destination,
+	IN CONST VOID *Source,
+	IN UINTN Length
+	)
+{
+	CONST UINTN Cr0 = AsmReadCr0();
+	CONST BOOLEAN WpSet = (Cr0 & CR0_WP) != 0;
+	if (WpSet)
+		AsmWriteCr0(Cr0 & ~CR0_WP);
+
+	VOID* Result = CopyMem(Destination, Source, Length);
+	
+	if (WpSet)
+		AsmWriteCr0(Cr0);
+
+	return Result;
+}
+
+VOID*
+EFIAPI
+SetWpMem(
+	OUT VOID *Destination,
+	IN UINTN Length,
+	IN UINT8 Value
+	)
+{
+	CONST UINTN Cr0 = AsmReadCr0();
+	CONST BOOLEAN WpSet = (Cr0 & CR0_WP) != 0;
+	if (WpSet)
+		AsmWriteCr0(Cr0 & ~CR0_WP);
+
+	VOID* Result = SetMem(Destination, Length, Value);
+	
+	if (WpSet)
+		AsmWriteCr0(Cr0);
+
+	return Result;
 }
 
 INTN
