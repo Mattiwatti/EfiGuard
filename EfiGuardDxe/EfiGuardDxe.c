@@ -381,7 +381,7 @@ ExitBootServicesEvent(
 			PrintKernelPatchInfo();
 
 			// Give time for user to register their loss and allow for the grieving process to set in
-			RtlSleep(2000);
+			RtlStall(2000);
 
 			// Prompt user to ask what they want to do
 			Print(L"\r\nPress any key to continue anyway, or press ESC to reboot.\r\n");

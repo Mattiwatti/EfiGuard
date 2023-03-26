@@ -8,28 +8,46 @@
 #include <Library/UefiBootServicesTableLib.h>
 
 #ifndef ZYDIS_DISABLE_FORMATTER
-
 #include <Library/PrintLib.h>
 #include <Zycore/Format.h>
 
 STATIC ZydisFormatterFunc DefaultInstructionFormatter;
-
 #endif
 
-//
-// When debugging, we can choose between poor debugging facilities (VirtualBox) or poor performance and Windows compatibility (QEMU).
-// (I guess there is also the closed source thing with the horrible user interface that installs 50 drivers on the host (VMware))
-// This is a bandaid to make Print() calls readable ...for a while... when using VirtualBox or a live machine with no debugger
-//
+
 EFI_STATUS
-EFIAPI
 RtlSleep(
 	IN UINTN Milliseconds
 	)
 {
 	ASSERT(gBS != NULL);
-	ASSERT(gBS->Stall != NULL);
 
+	// Create a timer event, set its timeout, and wait for it
+	EFI_EVENT TimerEvent;
+	EFI_STATUS Status = gBS->CreateEvent(EVT_TIMER, 0, NULL, NULL, &TimerEvent);
+	if (EFI_ERROR(Status))
+		return RtlStall(Milliseconds); // Fall back to stalling CPU
+
+	gBS->SetTimer(TimerEvent,
+				TimerRelative,
+				EFI_TIMER_PERIOD_MILLISECONDS(Milliseconds));
+
+	UINTN Index;
+	Status = gBS->WaitForEvent(1, &TimerEvent, &Index);
+	if (EFI_ERROR(Status))
+		Status = RtlStall(Milliseconds);
+
+	gBS->CloseEvent(TimerEvent);
+	return Status;
+}
+
+EFI_STATUS
+EFIAPI
+RtlStall(
+	IN UINTN Milliseconds
+	)
+{
+	ASSERT(gBS != NULL);
 	return gBS->Stall(Milliseconds * 1000);
 }
 
@@ -189,7 +207,7 @@ WaitForKey(
 		if (Tpl == TPL_APPLICATION)
 			gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index); // Yep
 		else
-			RtlSleep(1); // Nope; burn CPU. // TODO: find a way to parallelize this to achieve GeForce FX 5800 temperatures
+			RtlStall(1); // Nope; burn CPU. // TODO: find a way to parallelize this to achieve GeForce FX 5800 temperatures
 
 		// At TPL_APPLICATION, we will always get EFI_SUCCESS (barring hardware failures). At higher TPLs we may also get EFI_NOT_READY
 		Status = gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);

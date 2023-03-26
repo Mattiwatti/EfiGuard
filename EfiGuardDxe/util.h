@@ -10,11 +10,20 @@
 
 
 //
-// Stalls CPU for N milliseconds
+// Waits for a timer event for N milliseconds.
+// Requires current TPL to be TPL_APPLICATION.
 //
 EFI_STATUS
 EFIAPI
 RtlSleep(
+	IN UINTN Milliseconds
+	);
+
+//
+// Stalls CPU for N milliseconds.
+//
+EFI_STATUS
+RtlStall(
 	IN UINTN Milliseconds
 	);
 
