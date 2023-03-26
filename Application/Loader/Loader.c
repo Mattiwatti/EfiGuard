@@ -375,15 +375,17 @@ TryBootOptionsInOrder(
 
 		//
 		// Filter out non-Windows boot entries.
-		// Apply some heuristics based on the device path, which must end in "bootmgfw.efi" or "bootx64.efi".
-		// In the latter case we may get false positives, but for some types of boots (WinPE, Windows To Go,
-		// and that VM product from Larry Ellison that still can't emulate NVRAM properly), the name will
-		// always be bootx64.efi, so this can't be avoided.
-		//
-		// For the common case, a simpler way would have been to check if the description is "Windows Boot Manager",
-		// but it turns out that we need the full path anyway to LoadImage the file with BootPolicy = TRUE.
+		// Check the description first as "Windows Boot Manager" entries are obviously going to boot Windows.
+		// However the inverse is not true, i.e. not all entries that boot Windows will have this description.
 		//
 		BOOLEAN MaybeWindows = FALSE;
+		if (BootOptions[Index].Description != NULL &&
+			StrStr(BootOptions[Index].Description, L"Windows Boot Manager") != NULL)
+		{
+			MaybeWindows = TRUE;
+		}
+
+		// We need the full path to LoadImage the file with BootPolicy = TRUE.
 		UINTN FileSize;
 		VOID* FileBuffer = EfiBootManagerGetLoadOptionBuffer(BootOptions[Index].FilePath, &FullPath, &FileSize);
 		if (FileBuffer != NULL)
@@ -394,9 +396,14 @@ TryBootOptionsInOrder(
 		if (FullPath == NULL)
 			FullPath = BootOptions[Index].FilePath;
 
-		// Get the text representation of the device path and check it for our suspects
+		// Get the text representation of the device path
 		CHAR16* ConvertedPath = ConvertDevicePathToText(FullPath, FALSE, FALSE);
-		if (ConvertedPath != NULL &&
+
+		// If this is not a named "Windows Boot Manager" entry, apply some heuristics based on the device path,
+		// which must end in "bootmgfw.efi" or "bootx64.efi". In the latter case we may get false positives,
+		// but for some types of boots the filename will always be bootx64.efi, so this can't be avoided.
+		if (!MaybeWindows &&
+			ConvertedPath != NULL &&
 			(StrStr(ConvertedPath, L"bootmgfw.efi") != NULL || StrStr(ConvertedPath, L"BOOTMGFW.EFI") != NULL ||
 			StrStr(ConvertedPath, L"bootx64.efi") != NULL || StrStr(ConvertedPath, L"BOOTX64.EFI") != NULL))
 		{
