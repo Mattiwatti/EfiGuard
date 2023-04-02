@@ -767,6 +767,7 @@ PatchNtoskrnl(
 	else
 	{
 		PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] Patching ntoskrnl.exe v%u.%u.%u.%u...\r\n", MajorVersion, MinorVersion, BuildNumber, Revision);
+		gKernelPatchInfo.KernelBuildNumber = BuildNumber;
 
 		// Check if this is a supported kernel version. All versions after Vista SP1 should be supported.
 		// There is no "maximum allowed" version; e.g. 10.1, 11.0... are OK. Windows 10 is a whole three major versions higher than Windows 7,

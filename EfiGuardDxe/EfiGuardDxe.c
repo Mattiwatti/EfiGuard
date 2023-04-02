@@ -354,6 +354,9 @@ ExitBootServicesEvent(
 	{
 		CONST EFI_STATUS Status = gKernelPatchInfo.Status;
 		CONST INT32 OriginalAttribute = gST->ConOut->Mode->Attribute;
+
+		// Default to showing a message in case of errors unless we are booting a pre-Vista kernel such as XP, in which case EFI_UNSUPPORTED is expected.
+		CONST BOOLEAN ShowErrorMessage = gKernelPatchInfo.KernelBuildNumber == 0 || gKernelPatchInfo.KernelBuildNumber >= 6001 || Status != EFI_UNSUPPORTED;
 		if (Status == EFI_SUCCESS)
 		{
 			SetConsoleTextColour(EFI_GREEN, TRUE);
@@ -366,7 +369,7 @@ ExitBootServicesEvent(
 				WaitForKey();
 			}
 		}
-		else if (gKernelPatchInfo.BuildNumber >= 6000)
+		else if (ShowErrorMessage)
 		{
 			// Patch failed. Most important stuff first: make a fake BSOD, because... reasons
 			// TODO if really bored: use GOP to set the BG colour on the whole screen.
@@ -392,7 +395,7 @@ ExitBootServicesEvent(
 		}
 
 		gST->ConOut->SetAttribute(gST->ConOut, OriginalAttribute);
-		if (Status != EFI_SUCCESS)
+		if (Status != EFI_SUCCESS && ShowErrorMessage)
 			gST->ConOut->ClearScreen(gST->ConOut);
 	}
 
@@ -635,7 +638,8 @@ EfiGuardInitialize(
 	gKernelPatchInfo.Status = EFI_SUCCESS;
 	gKernelPatchInfo.BufferSize = 0;
 	SetMem64(gKernelPatchInfo.Buffer, sizeof(gKernelPatchInfo.Buffer), 0ULL);
-	gKernelPatchInfo.BuildNumber = 0;
+	gKernelPatchInfo.WinloadBuildNumber = 0;
+	gKernelPatchInfo.KernelBuildNumber = 0;
 	gKernelPatchInfo.KernelBase = NULL;
 
 	// The ASCII banner is very pretty - ensure the user has enough time to admire it

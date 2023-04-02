@@ -131,7 +131,7 @@ HookedOslFwpKernelSetupPhase1(
 	CopyWpMem((VOID*)gOriginalOslFwpKernelSetupPhase1, gOslFwpKernelSetupPhase1Backup, sizeof(gHookTemplate));
 
 	UINT8* LoadOrderListHeadAddress = (UINT8*)&LoaderBlock->LoadOrderListHead;
-	if (gKernelPatchInfo.BuildNumber < 7600)
+	if (gKernelPatchInfo.WinloadBuildNumber < 7600)
 	{
 		// We are booting Vista or some other fossil, which means that our LOADER_PARAMETER_BLOCK declaration in no way matches what is
 		// actually being passed by the loader. Notably, the first four UINT32 fields are absent, so fix up the list entry pointer.
@@ -609,6 +609,9 @@ PatchWinload(
 	{
 		Print(L"\r\nPatching winload.efi v%u.%u.%u.%u...\r\n", MajorVersion, MinorVersion, BuildNumber, Revision);
 
+		// Some... adjustments... need to be made later on in the case of pre-Windows 7 loader blocks, so store the build number
+		gKernelPatchInfo.WinloadBuildNumber = BuildNumber;
+
 		// Check if this is a supported winload version. All patches should work on all versions since Vista SP1,
 		// except for the ImgpFilterValidationFailure patch because this function only exists on Windows 7 and higher.
 		if (BuildNumber < 6001)
@@ -617,9 +620,6 @@ PatchWinload(
 			Status = EFI_UNSUPPORTED;
 			goto Exit;
 		}
-
-		// Some... adjustments... need to be made later on in the case of pre-Windows 7 loader blocks, so store the build number
-		gKernelPatchInfo.BuildNumber = BuildNumber;
 	}
 
 	// Find the .text and .rdata sections
