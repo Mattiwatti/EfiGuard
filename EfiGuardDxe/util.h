@@ -6,7 +6,12 @@
 #include <Zydis/Formatter.h>
 #endif
 
-#define CR0_WP		((UINTN)0x10000) // CR0.WP
+#define CR0_WP			((UINTN)0x00010000) // CR0.WP
+#define CR0_PG			((UINTN)0x80000000) // CR0.PG
+#define CR4_LA57		((UINTN)0x00001000) // CR4.LA57
+#define MSR_EFER		((UINTN)0xC0000080) // Extended Function Enable Register
+#define EFER_LMA		((UINTN)0x00000400) // Long Mode Active
+#define EFER_UAIE		((UINTN)0x00100000) // Upper Address Ignore Enabled
 
 
 //
@@ -79,6 +84,15 @@ SetWpMem(
 	OUT VOID *Destination,
 	IN UINTN Length,
 	IN UINT8 Value
+	);
+
+//
+// Returns TRUE if 5-level paging is enabled.
+//
+BOOLEAN
+EFIAPI
+IsFiveLevelPagingEnabled(
+	VOID
 	);
 
 //

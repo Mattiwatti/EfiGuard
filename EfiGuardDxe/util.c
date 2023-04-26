@@ -160,6 +160,17 @@ SetWpMem(
 	return Result;
 }
 
+BOOLEAN
+EFIAPI
+IsFiveLevelPagingEnabled(
+	VOID
+	)
+{
+	return (AsmReadCr0() & CR0_PG) != 0 &&
+		(AsmReadMsr64(MSR_EFER) & EFER_LMA) != 0 &&
+		(AsmReadCr4() & CR4_LA57) != 0;
+}
+
 INTN
 EFIAPI
 StrniCmp(

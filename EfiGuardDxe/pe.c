@@ -19,10 +19,9 @@ RtlIsCanonicalAddress(
 	// 32-bit mode only supports 4GB max, so limits are not an issue
 	return TRUE;
 #elif defined(MDE_CPU_X64)
-	// The most-significant 16 bits must be all 1 or all 0. (64 - 16) = 48bit linear address range.
-	// 0xFFFF800000000000 = Significant 16 bits set
-	// 0x0000800000000000 = 48th bit set
-	return (((Address & 0xFFFF800000000000) + 0x800000000000) & ~0x800000000000) == 0;
+	CONST UINTN LinearAddressBits = IsFiveLevelPagingEnabled() ? 57 : 48;
+	return ((UINTN)(((INTN)Address >> LinearAddressBits) + 1) <= 1) ||
+		((AsmReadMsr64(MSR_EFER) & EFER_UAIE) != 0);
 #endif
 }
 
