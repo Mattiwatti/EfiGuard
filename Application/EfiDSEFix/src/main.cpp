@@ -38,7 +38,7 @@ int wmain(int argc, wchar_t** argv)
 	const BOOLEAN Win8OrHigher = (RtlNtMajorVersion() >= 6 && RtlNtMinorVersion() >= 2) || RtlNtMajorVersion() > 6;
 	const ULONG EnabledCiOptionsValue = Win8OrHigher ? 0x6 : CODEINTEGRITY_OPTION_ENABLED;
 	const PCWCHAR CiOptionsName = Win8OrHigher ? L"g_CiOptions" : L"g_CiEnabled";
-	ULONG CiOptionsValue = 0;
+	ULONG CiOptionsValue;
 	BOOLEAN ReadOnly = FALSE;
 
 	if (wcsncmp(argv[1], L"-c", sizeof(L"-c") / sizeof(WCHAR) - 1) == 0 ||
@@ -81,6 +81,11 @@ int wmain(int argc, wchar_t** argv)
 		wcsncmp(argv[1], L"--info", sizeof(L"--info") / sizeof(WCHAR) - 1) == 0)
 	{
 		return DumpSystemInformation();
+	}
+	else
+	{
+		PrintUsage(argv[0]);
+		return STATUS_INVALID_PARAMETER;
 	}
 
 	// Trigger EFI driver exploit and write new value to g_CiOptions/g_CiEnabled
