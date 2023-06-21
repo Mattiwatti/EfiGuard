@@ -60,7 +60,7 @@ The output binary `EfiDSEFix.exe` will be in `Application/EfiDSEFix/bin`.
 The Visual Studio solution also includes projects for `EfiGuardDxe.efi` and `Loader.efi` which can be used with [VisualUefi](https://github.com/ionescu007/VisualUefi), but these projects are not built by default as they will not link without additional code, and the build output will be inferior (bigger) than what EDK2 produces. `Loader.efi` will not link at all due to VisualUefi missing UefiBootManagerLib. These project files are thus meant as a development aid only and the EFI files should still be compiled with EDK2. To set up VisualUefi for this purpose, clone the repository into `workspace/VisualUefi` and open `EfiGuard.sln`.
 
 # Architecture
-  ![architecture](Misc/EfiGuard.png)
+  ![architecture](Misc/EfiGuard.svg)
 While EfiGuard is a UEFI bootkit, it did not start out as one. EfiGuard was originally an on-disk patcher running on NT (similar to [UPGDSED](https://github.com/hfiref0x/UPGDSED)), intended to test the viability of a disassembler-based aproach, as opposed to using PDB symbols and version-specific signatures. [PatchNtoskrnl.c](EfiGuardDxe/PatchNtoskrnl.c) still looks very much like this original design. Only after this approach proved successful, with no modifications to code needed in over a year of Windows updates, did UEFI come into the picture as a way to further improve capabilities and ease of use.
 
 Some of the benefits provided by a bootkit approach include:
