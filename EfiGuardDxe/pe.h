@@ -177,7 +177,7 @@ typedef struct _VS_VERSIONINFO
 //
 // Function table entry data
 //
-typedef struct _RUNTIME_FUNCTION
+typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY
 {
 	UINT32 BeginAddress;
 	UINT32 EndAddress;
@@ -186,7 +186,7 @@ typedef struct _RUNTIME_FUNCTION
 		UINT32 UnwindInfoAddress;
 		UINT32 UnwindData;
 	} u;
-} RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
+} IMAGE_RUNTIME_FUNCTION_ENTRY, *PIMAGE_RUNTIME_FUNCTION_ENTRY;
 
 
 //

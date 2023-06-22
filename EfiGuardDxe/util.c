@@ -448,16 +448,16 @@ BacktrackToFunctionStart(
 	if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION)
 		return NULL;
 
-	CONST PRUNTIME_FUNCTION FunctionTable = (PRUNTIME_FUNCTION)(ImageBase + NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress);
+	CONST PIMAGE_RUNTIME_FUNCTION_ENTRY FunctionTable = (PIMAGE_RUNTIME_FUNCTION_ENTRY)(ImageBase + NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress);
 	CONST UINT32 FunctionTableSize = NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size;
 	if (FunctionTableSize == 0)
 		return NULL;
 
 	// Do a binary search until we find the function that contains our address
 	CONST UINT32 RelativeAddress = (UINT32)(AddressInFunction - ImageBase);
-	PRUNTIME_FUNCTION FunctionEntry = NULL;
+	PIMAGE_RUNTIME_FUNCTION_ENTRY FunctionEntry = NULL;
 	INT32 Low = 0;
-	INT32 High = (INT32)(FunctionTableSize / sizeof(RUNTIME_FUNCTION)) - 1;
+	INT32 High = (INT32)(FunctionTableSize / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY)) - 1;
 	
 	while (High >= Low)
 	{
@@ -477,7 +477,7 @@ BacktrackToFunctionStart(
 		// If the function entry specifies indirection, get the address of the master function entry
 		if ((FunctionEntry->u.UnwindData & RUNTIME_FUNCTION_INDIRECT) != 0)
 		{
-			FunctionEntry = (PRUNTIME_FUNCTION)(FunctionEntry->u.UnwindData + ImageBase - 1);
+			FunctionEntry = (PIMAGE_RUNTIME_FUNCTION_ENTRY)(FunctionEntry->u.UnwindData + ImageBase - 1);
 		}
 		
 		return (UINT8*)ImageBase + FunctionEntry->BeginAddress;
