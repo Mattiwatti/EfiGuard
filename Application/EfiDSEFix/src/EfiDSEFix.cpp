@@ -35,7 +35,7 @@ FindKernelModule(
 		if (_stricmp(ModuleName, reinterpret_cast<PCHAR>(Module.FullPathName) + Module.OffsetToFileName) == 0)
 		{
 			*ModuleBase = reinterpret_cast<ULONG_PTR>(Module.ImageBase);
-			Status = STATUS_SUCCESS;
+			Status = Module.ImageBase == nullptr ? STATUS_NOT_FOUND : STATUS_SUCCESS;
 			break;
 		}
 	}
@@ -302,6 +302,28 @@ SetSystemEnvironmentPrivilege(
 	return Status;
 }
 
+static
+NTSTATUS
+SetDebugPrivilege(
+	_In_ BOOLEAN Enable,
+	_Out_opt_ PBOOLEAN WasEnabled
+	)
+{
+	if (WasEnabled != nullptr)
+		*WasEnabled = FALSE;
+
+	BOOLEAN SeDebugWasEnabled;
+	const NTSTATUS Status = RtlAdjustPrivilege(SE_DEBUG_PRIVILEGE,
+												Enable,
+												FALSE,
+												&SeDebugWasEnabled);
+
+	if (NT_SUCCESS(Status) && WasEnabled != nullptr)
+		*WasEnabled = SeDebugWasEnabled;
+
+	return Status;
+}
+
 NTSTATUS
 TestSetVariableHook(
 	)
@@ -309,11 +331,17 @@ TestSetVariableHook(
 	UINT16 Mz;
 
 	// Enable privileges in case we were called directly from the CLI with --check
-	BOOLEAN SeSystemEnvironmentWasEnabled;
+	BOOLEAN SeSystemEnvironmentWasEnabled, SeDebugWasEnabled;
 	NTSTATUS Status = SetSystemEnvironmentPrivilege(TRUE, &SeSystemEnvironmentWasEnabled);
 	if (!NT_SUCCESS(Status))
 	{
 		Printf(L"Fatal error: failed to acquire SE_SYSTEM_ENVIRONMENT_PRIVILEGE. Make sure you are running as administrator.\n");
+		return Status;
+	}
+	Status = SetDebugPrivilege(TRUE, &SeDebugWasEnabled);
+	if (!NT_SUCCESS(Status))
+	{
+		Printf(L"Fatal error: failed to acquire SE_DEBUG_PRIVILEGE. Make sure you are running as administrator.\n");
 		return Status;
 	}
 
@@ -383,6 +411,7 @@ TestSetVariableHook(
 
 Exit:
 	SetSystemEnvironmentPrivilege(SeSystemEnvironmentWasEnabled, nullptr);
+	SetDebugPrivilege(SeDebugWasEnabled, nullptr);
 
 	return Status;
 }
@@ -459,22 +488,28 @@ AdjustCiOptions(
 	if (OldCiOptionsValue != nullptr)
 		*OldCiOptionsValue = CODEINTEGRITY_OPTION_ENABLED;
 
-	// Find CI!g_CiOptions/nt!g_CiEnabled
-	PVOID CiOptionsAddress;
-	NTSTATUS Status = AnalyzeCi(&CiOptionsAddress);
-	if (!NT_SUCCESS(Status))
-		return Status;
-
-	Printf(L"%ls at 0x%p.\n", (NtCurrentPeb()->OSBuildNumber >= 9200 ? L"CI!g_CiOptions" : L"nt!g_CiEnabled"), CiOptionsAddress);
-
 	// Enable privileges
-	BOOLEAN SeSystemEnvironmentWasEnabled;
-	Status = SetSystemEnvironmentPrivilege(TRUE, &SeSystemEnvironmentWasEnabled);
+	BOOLEAN SeSystemEnvironmentWasEnabled, SeDebugWasEnabled;
+	NTSTATUS Status = SetSystemEnvironmentPrivilege(TRUE, &SeSystemEnvironmentWasEnabled);
 	if (!NT_SUCCESS(Status))
 	{
 		Printf(L"Fatal error: failed to acquire SE_SYSTEM_ENVIRONMENT_PRIVILEGE. Make sure you are running as administrator.\n");
 		return Status;
 	}
+	Status = SetDebugPrivilege(TRUE, &SeDebugWasEnabled);
+	if (!NT_SUCCESS(Status))
+	{
+		Printf(L"Fatal error: failed to acquire SE_DEBUG_PRIVILEGE. Make sure you are running as administrator.\n");
+		return Status;
+	}
+
+	// Find CI!g_CiOptions/nt!g_CiEnabled
+	PVOID CiOptionsAddress;
+	Status = AnalyzeCi(&CiOptionsAddress);
+	if (!NT_SUCCESS(Status))
+		return Status;
+
+	Printf(L"%ls at 0x%p.\n", (NtCurrentPeb()->OSBuildNumber >= 9200 ? L"CI!g_CiOptions" : L"nt!g_CiEnabled"), CiOptionsAddress);
 
 	// Enable/disable CI
 	Status = TriggerExploit(CiOptionsAddress,
@@ -484,6 +519,7 @@ AdjustCiOptions(
 
 	// Revert privileges
 	SetSystemEnvironmentPrivilege(SeSystemEnvironmentWasEnabled, nullptr);
+	SetDebugPrivilege(SeDebugWasEnabled, nullptr);
 
 	return Status;
 }
