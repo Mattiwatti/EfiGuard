@@ -28,6 +28,7 @@ RtlSleep(
 // Stalls CPU for N milliseconds.
 //
 EFI_STATUS
+EFIAPI
 RtlStall(
 	IN UINTN Milliseconds
 	);

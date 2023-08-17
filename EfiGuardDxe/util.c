@@ -16,6 +16,7 @@ STATIC ZydisFormatterFunc DefaultInstructionFormatter;
 
 
 EFI_STATUS
+EFIAPI
 RtlSleep(
 	IN UINTN Milliseconds
 	)
