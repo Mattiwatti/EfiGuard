@@ -83,6 +83,9 @@
 !if $(EAC_COMPAT_MODE) == 1
   *_*_*_CC_FLAGS = -D EAC_COMPAT_MODE=1
 !endif
+!ifdef $(EFIGUARD_DRIVER_FILENAME)
+  *_*_*_CC_FLAGS = -D EFIGUARD_DRIVER_FILENAME=\"$(EFIGUARD_DRIVER_FILENAME)\"
+!endif
 
   # Source files are UTF-8 without BOM. MSVC will convert other encodings to this without asking, so this is not really a choice
   MSFT:*_*_*_CC_FLAGS = /utf-8

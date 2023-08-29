@@ -27,7 +27,9 @@
 //
 // Paths to the driver to try
 //
+#ifndef EFIGUARD_DRIVER_FILENAME
 #define EFIGUARD_DRIVER_FILENAME		L"EfiGuardDxe.efi"
+#endif
 STATIC CHAR16* mDriverPaths[] = {
 	L"\\EFI\\Boot\\" EFIGUARD_DRIVER_FILENAME,
 	L"\\EFI\\" EFIGUARD_DRIVER_FILENAME,
