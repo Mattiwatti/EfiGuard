@@ -266,20 +266,19 @@ StartAndConfigureDriver(
 			Print(L"[LOADER] StartImage failed: %llx (%r).\r\n", Status, Status);
 			goto Exit;
 		}
-
-		Status = gBS->LocateProtocol(&gEfiGuardDriverProtocolGuid,
-									NULL,
-									(VOID**)&EfiGuardDriverProtocol);
-		if (EFI_ERROR(Status))
-		{
-			Print(L"[LOADER] LocateProtocol failed: %llx (%r).\r\n", Status, Status);
-			goto Exit;
-		}
 	}
 	else
 	{
+		ASSERT_EFI_ERROR(Status);
 		Print(L"[LOADER] The driver is already loaded.\r\n");
-		Status = EFI_ALREADY_STARTED;
+	}
+
+	Status = gBS->LocateProtocol(&gEfiGuardDriverProtocolGuid,
+								NULL,
+								(VOID**)&EfiGuardDriverProtocol);
+	if (EFI_ERROR(Status))
+	{
+		Print(L"[LOADER] LocateProtocol failed: %llx (%r).\r\n", Status, Status);
 		goto Exit;
 	}
 
@@ -424,7 +423,9 @@ TryBootOptionsInOrder(
 		// Print what we're booting
 		if (ConvertedPath != NULL)
 		{
-			Print(L"Booting %Sdevice path %S...\r\n", IsLegacy ? L"legacy " : L"", ConvertedPath);
+			Print(L"Booting \"%S\"...\r\n    -> %S = %S\r\n",
+				(BootOptions[Index].Description != NULL ? BootOptions[Index].Description : L"<null description>"),
+				IsLegacy ? L"Legacy path" : L"Path", ConvertedPath);
 			FreePool(ConvertedPath);
 		}
 
@@ -580,9 +581,6 @@ UefiMain(
 	// Locate, load, start and configure the driver
 	//
 	CONST EFI_STATUS DriverStatus = StartAndConfigureDriver(ImageHandle, SystemTable);
-	if (DriverStatus == EFI_ALREADY_STARTED)
-		return EFI_SUCCESS;
-
 	if (EFI_ERROR(DriverStatus))
 	{
 		Print(L"\r\nERROR: driver load failed with status %llx (%r).\r\n"
