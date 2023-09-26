@@ -220,11 +220,6 @@ HookedLoadImage(
 								LoadedImage->ImageBase,
 								LoadedImage->ImageSize);
 			}
-			else
-			{
-				// A non-Windows OS is being booted. Unload ourselves
-				EfiGuardUnload(gImageHandle);
-			}
 		}
 	}
 
@@ -402,7 +397,7 @@ ExitBootServicesEvent(
 	// If the DSE bypass method is *not* DSE_DISABLE_SETVARIABLE_HOOK, perform some cleanup now. In principle this should allow
 	// linking with /SUBSYSTEM:EFI_BOOT_SERVICE_DRIVER, because our driver image may be freed after this callback returns.
 	// Using DSE_DISABLE_SETVARIABLE_HOOK requires linking with /SUBSYSTEM:EFI_RUNTIME_DRIVER, because the image must not be freed.
-	if (gDriverConfig.DseBypassMethod != DSE_DISABLE_SETVARIABLE_HOOK)
+	if (gDriverConfig.DseBypassMethod != DSE_DISABLE_SETVARIABLE_HOOK || gBootmgfwHandle == NULL)
 	{
 		// Uninstall our installed driver protocols
 		gBS->UninstallMultipleProtocolInterfaces(gImageHandle,
