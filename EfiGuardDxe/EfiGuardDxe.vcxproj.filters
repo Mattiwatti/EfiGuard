@@ -21,6 +21,9 @@
     <Filter Include="Header Files\Zydis\Internal">
       <UniqueIdentifier>{09843B9B-51DC-4418-9585-2ED4BD3F1643}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\X64">
+      <UniqueIdentifier>{4cd0c7c8-71ff-4d6d-bb2d-a9e65cc3d7ce}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\Protocol">
       <UniqueIdentifier>{aa6da080-fea5-447e-8722-35a98038eb4e}</UniqueIdentifier>
     </Filter>
@@ -95,6 +98,16 @@
     <ClCompile Include="Zydis\src\Zydis.c">
       <Filter>Source Files\Zydis</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="X64\Cet.asm">
+      <Filter>Source Files\X64</Filter>
+    </MASM>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="X64\Cet.nasm">
+      <Filter>Source Files\X64</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EfiGuardDxe.h">

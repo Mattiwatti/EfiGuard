@@ -8,6 +8,7 @@
 
 #define CR0_WP			((UINTN)0x00010000) // CR0.WP
 #define CR0_PG			((UINTN)0x80000000) // CR0.PG
+#define CR4_CET			((UINTN)0x00800000) // CR4.CET
 #define CR4_LA57		((UINTN)0x00001000) // CR4.LA57
 #define MSR_EFER		((UINTN)0xC0000080) // Extended Function Enable Register
 #define EFER_LMA		((UINTN)0x00000400) // Long Mode Active
@@ -62,6 +63,45 @@ VOID
 EFIAPI
 PrintKernelPatchInfo(
 	VOID
+	);
+
+//
+// Disables CET.
+//
+VOID
+EFIAPI
+DisableCet(
+	VOID
+	);
+
+//
+// Enables CET.
+//
+VOID
+EFIAPI
+EnableCet(
+	VOID
+	);
+
+//
+// Disables write protection if it is currently enabled.
+// Returns the current CET and WP states for use when calling EnableWriteProtect().
+//
+VOID
+EFIAPI
+DisableWriteProtect(
+	OUT BOOLEAN *WpEnabled,
+	OUT BOOLEAN *CetEnabled
+	);
+
+//
+// Enables write protection if it was previously enabled.
+//
+VOID
+EFIAPI
+EnableWriteProtect(
+	IN BOOLEAN WpEnabled,
+	IN BOOLEAN CetEnabled
 	);
 
 //

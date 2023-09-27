@@ -23,6 +23,10 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(SolutionDir)\EfiGuard.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <PreprocessorDefinitions>ZYAN_NO_LIBC;ZYCORE_STATIC_BUILD;ZYDIS_STATIC_BUILD;ZYDIS_DISABLE_ENCODER;ZYDIS_DISABLE_FORMATTER;ZYDIS_DISABLE_AVX512;ZYDIS_DISABLE_KNC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -71,6 +75,12 @@
     <ClCompile Include="Zydis\src\String.c" />
     <ClCompile Include="Zydis\src\Utils.c" />
     <ClCompile Include="Zydis\src\Zydis.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="X64\Cet.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="X64\Cet.nasm" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Include\Protocol\EfiGuard.h" />

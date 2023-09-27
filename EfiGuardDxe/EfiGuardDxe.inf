@@ -26,6 +26,9 @@
   Zydis/src/Utils.c
   Zydis/src/Zydis.c
 
+[Sources.X64]
+  X64/Cet.nasm
+
 [Packages]
   MdePkg/MdePkg.dec
   EfiGuardPkg/EfiGuardPkg.dec

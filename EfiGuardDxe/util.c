@@ -118,6 +118,40 @@ PrintKernelPatchInfo(
 	}
 }
 
+VOID
+EFIAPI
+DisableWriteProtect(
+	OUT BOOLEAN *WpEnabled,
+	OUT BOOLEAN *CetEnabled
+	)
+{
+	CONST UINTN Cr0 = AsmReadCr0();
+	*WpEnabled = (Cr0 & CR0_WP) != 0;
+	*CetEnabled = (AsmReadCr4() & CR4_CET) != 0;
+
+	if (*WpEnabled)
+	{
+		if (*CetEnabled)
+			DisableCet();
+		AsmWriteCr0(Cr0 & ~CR0_WP);
+	}
+}
+
+VOID
+EFIAPI
+EnableWriteProtect(
+	IN BOOLEAN WpEnabled,
+	IN BOOLEAN CetEnabled
+	)
+{
+	if (WpEnabled)
+	{
+		AsmWriteCr0(AsmReadCr0() | CR0_WP);
+		if (CetEnabled)
+			EnableCet();
+	}
+}
+
 VOID*
 EFIAPI
 CopyWpMem(
@@ -126,16 +160,12 @@ CopyWpMem(
 	IN UINTN Length
 	)
 {
-	CONST UINTN Cr0 = AsmReadCr0();
-	CONST BOOLEAN WpSet = (Cr0 & CR0_WP) != 0;
-	if (WpSet)
-		AsmWriteCr0(Cr0 & ~CR0_WP);
+	BOOLEAN WpEnabled, CetEnabled;
+	DisableWriteProtect(&WpEnabled, &CetEnabled);
 
 	VOID* Result = CopyMem(Destination, Source, Length);
 	
-	if (WpSet)
-		AsmWriteCr0(Cr0);
-
+	EnableWriteProtect(WpEnabled, CetEnabled);
 	return Result;
 }
 
@@ -147,16 +177,12 @@ SetWpMem(
 	IN UINT8 Value
 	)
 {
-	CONST UINTN Cr0 = AsmReadCr0();
-	CONST BOOLEAN WpSet = (Cr0 & CR0_WP) != 0;
-	if (WpSet)
-		AsmWriteCr0(Cr0 & ~CR0_WP);
+	BOOLEAN WpEnabled, CetEnabled;
+	DisableWriteProtect(&WpEnabled, &CetEnabled);
 
 	VOID* Result = SetMem(Destination, Length, Value);
 	
-	if (WpSet)
-		AsmWriteCr0(Cr0);
-
+	EnableWriteProtect(WpEnabled, CetEnabled);
 	return Result;
 }
 
