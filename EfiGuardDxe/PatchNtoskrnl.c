@@ -52,17 +52,18 @@ STATIC CONST UINT8 SigKiMcaDeferredRecoveryService[] = {
 // If int 20h is issued from kernel mode, the PatchGuard verification routine KiSwInterruptDispatch is called.
 STATIC CONST UINT8 SigKiSwInterrupt[] = {
 	0xFB,													// sti
-	0x48, 0x8D, 0xCC, 0xCC,									// lea rcx, XX
+	0x48, 0x8D, 0xCC, 0xCC,									// lea REG, [REG-XX]
 	0xE8, 0xCC, 0xCC, 0xCC, 0xCC,							// call KiSwInterruptDispatch
 	0xFA													// cli
 };
+STATIC CONST UINTN SigKiSwInterruptCallOffset = 5, SigKiSwInterruptCliOffset = 10;
 
 // Signature for nt!SeCodeIntegrityQueryInformation, called through NtQuerySystemInformation(SystemCodeIntegrityInformation).
 // This function has actually existed since Vista in various forms, sometimes (8/8.1/early 10) inlined in ExpQuerySystemInformation.
 // This signature is only for the Windows 10 RS3+ version. I could add more signatures but this is a pretty superficial patch anyway.
 STATIC CONST UINT8 SigSeCodeIntegrityQueryInformation[] = {
 	0x48, 0x83, 0xEC,										// sub rsp, XX
-	0xCC, 0x48, 0x83, 0x3D, 0xCC, 0xCC, 0xCC, 0xCC, 0x00,	// cmp cs:qword_14035E638, 0
+	0xCC, 0x48, 0x83, 0x3D, 0xCC, 0xCC, 0xCC, 0xCC, 0x00,	// cmp ds:qword_xxxx, 0
 	0x4D, 0x8B, 0xC8,										// mov r9, r8
 	0x4C, 0x8B, 0xD1,										// mov r10, rcx
 	0x74, 0xCC												// jz XX
@@ -88,6 +89,7 @@ DisablePatchGuard(
 	IN UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN PEFI_IMAGE_SECTION_HEADER InitSection,
+	IN PEFI_IMAGE_SECTION_HEADER InitDataSection,
 	IN PEFI_IMAGE_SECTION_HEADER TextSection,
 	IN UINT16 BuildNumber
 	)
@@ -358,11 +360,21 @@ DisablePatchGuard(
 		}
 	}
 
-	// Search for KiSwInterrupt (only exists on Windows >= 10)
-	UINT8* KiSwInterruptPatternAddress = NULL;
+	// We need KiSwInterruptDispatch to call ExAllocatePool2 for our preferred method to work, because we rely on it to
+	// return null for zero pool tags. Windows 10 20H1 does export ExAllocatePool2, but without using it where we need it.
+	CONST BOOLEAN FindGlobalPgContext = BuildNumber >= 20348 && InitDataSection != NULL &&
+		GetProcedureAddress((UINTN)ImageBase, NtHeaders, "ExAllocatePool2") != NULL;
+
+	// Search for KiSwInterrupt[Dispatch] and optionally its global PatchGuard context (named g_PgContext here). Both of these only exist on Windows >= 10
+	UINT8* KiSwInterruptPatternAddress = NULL, *gPgContext = NULL;
 	if (BuildNumber >= 10240)
 	{
+		StartRva = TextSection->VirtualAddress;
+		SizeOfRawData = TextSection->SizeOfRawData;
+		StartVa = ImageBase + StartRva;
+
 		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiSwInterrupt pattern in .text ==\r\n");
+		UINT8* KiSwInterruptDispatchAddress = NULL;
 		CONST EFI_STATUS FindKiSwInterruptStatus = FindPattern(SigKiSwInterrupt,
 																0xCC,
 																sizeof(SigKiSwInterrupt),
@@ -371,13 +383,54 @@ DisablePatchGuard(
 																(VOID**)&KiSwInterruptPatternAddress);
 		if (EFI_ERROR(FindKiSwInterruptStatus))
 		{
-			// This is not a fatal error as the system can still boot without patching KiSwInterrupt.
+			// This is not a fatal error as the system can still boot without patching g_PgContext or KiSwInterrupt.
 			// However note that in this case, any attempt to issue int 20h from kernel mode later will result in a bugcheck.
 			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiSwInterrupt. Skipping patch.\r\n");
 		}
 		else
 		{
+			ASSERT(SigKiSwInterrupt[SigKiSwInterruptCallOffset] == 0xE8 && SigKiSwInterrupt[SigKiSwInterruptCliOffset] == 0xFA);
+			CONST INT32 Relative = *(INT32*)(KiSwInterruptPatternAddress + SigKiSwInterruptCallOffset + 1);
+			KiSwInterruptDispatchAddress = KiSwInterruptPatternAddress + SigKiSwInterruptCliOffset + Relative;
+			
 			PRINT_KERNEL_PATCH_MSG(L"    Found KiSwInterrupt pattern at 0x%llX.\r\n", (UINTN)KiSwInterruptPatternAddress);
+		}
+
+		if (KiSwInterruptDispatchAddress != NULL && FindGlobalPgContext)
+		{
+			// Start decode loop
+			Context.Length = 128;
+			Context.Offset = 0;
+			while ((Context.InstructionAddress = (ZyanU64)(KiSwInterruptDispatchAddress + Context.Offset),
+					Status = ZydisDecoderDecodeFull(&Context.Decoder,
+													(VOID*)Context.InstructionAddress,
+													Context.Length - Context.Offset,
+													&Context.Instruction,
+													Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
+			{
+				if (!ZYAN_SUCCESS(Status))
+				{
+					Context.Offset++;
+					continue;
+				}
+
+				// Check if this is 'mov REG, ds:g_PgContext'
+				if (Context.Instruction.operand_count == 2 &&
+					Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
+					(Context.Instruction.attributes & ZYDIS_ATTRIB_ACCEPTS_SEGMENT) != 0 &&
+					Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
+					Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[1].mem.base == ZYDIS_REGISTER_RIP &&
+					(Context.Operands[1].mem.segment == ZYDIS_REGISTER_CS || Context.Operands[1].mem.segment == ZYDIS_REGISTER_DS))
+				{
+					if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, (ZyanU64*)&gPgContext)))
+					{
+						PRINT_KERNEL_PATCH_MSG(L"    Found g_PgContext at 0x%llX.\r\n", (UINTN)gPgContext);
+						break;
+					}
+				}
+
+				Context.Offset += Context.Instruction.length;
+			}
 		}
 	}
 
@@ -395,8 +448,15 @@ DisablePatchGuard(
 		CopyWpMem(KiMcaDeferredRecoveryServiceCallers[0], &No, sizeof(No));
 		CopyWpMem(KiMcaDeferredRecoveryServiceCallers[1], &No, sizeof(No));
 	}
-	if (KiSwInterruptPatternAddress != NULL)
+	if (gPgContext != NULL)
+	{
+		CONST UINT64 NewPgContextAddress = (UINT64)ImageBase + InitDataSection->VirtualAddress; // Address in discardable section
+		CopyWpMem(gPgContext, &NewPgContextAddress, sizeof(NewPgContextAddress));
+	}
+	else if (KiSwInterruptPatternAddress != NULL)
+	{
 		SetWpMem(KiSwInterruptPatternAddress, sizeof(SigKiSwInterrupt), 0x90); // 11 x nop
+	}
 
 	// Print info
 	PRINT_KERNEL_PATCH_MSG(L"\r\n    Patched KeInitAmd64SpecificState [RVA: 0x%X].\r\n",
@@ -419,7 +479,12 @@ DisablePatchGuard(
 			(UINT32)(KiMcaDeferredRecoveryServiceCallers[0] - ImageBase),
 			(UINT32)(KiMcaDeferredRecoveryServiceCallers[1] - ImageBase));
 	}
-	if (KiSwInterruptPatternAddress != NULL)
+	if (gPgContext != NULL)
+	{
+		PRINT_KERNEL_PATCH_MSG(L"    Patched g_PgContext [RVA: 0x%X].\r\n",
+			(UINT32)(gPgContext - ImageBase));
+	}
+	else if (KiSwInterruptPatternAddress != NULL)
 	{
 		PRINT_KERNEL_PATCH_MSG(L"    Patched KiSwInterrupt [RVA: 0x%X].\r\n",
 			(UINT32)(KiSwInterruptPatternAddress - ImageBase));
@@ -788,7 +853,7 @@ PatchNtoskrnl(
 	}
 
 	// Find the INIT and PAGE sections
-	PEFI_IMAGE_SECTION_HEADER InitSection = NULL, TextSection = NULL, PageSection = NULL;
+	PEFI_IMAGE_SECTION_HEADER InitSection = NULL, InitDataSection = NULL, TextSection = NULL, PageSection = NULL;
 	PEFI_IMAGE_SECTION_HEADER Section = IMAGE_FIRST_SECTION(NtHeaders);
 	for (UINT16 i = 0; i < NtHeaders->FileHeader.NumberOfSections; ++i)
 	{
@@ -798,6 +863,8 @@ PatchNtoskrnl(
 
 		if (AsciiStrCmp(SectionName, "INIT") == 0)
 			InitSection = Section;
+		else if (AsciiStrCmp(SectionName, "INITDATA") == 0)
+			InitDataSection = Section;
 		else if (AsciiStrCmp(SectionName, ".text") == 0)
 			TextSection = Section;
 		else if (AsciiStrCmp(SectionName, "PAGE") == 0)
@@ -806,9 +873,7 @@ PatchNtoskrnl(
 		Section++;
 	}
 
-	ASSERT(InitSection != NULL);
-	ASSERT(TextSection != NULL);
-	ASSERT(PageSection != NULL);
+	ASSERT(InitSection != NULL && InitDataSection != NULL && TextSection != NULL && PageSection != NULL);
 
 	// Patch INIT and .text sections to disable PatchGuard
 	PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] Disabling PatchGuard... [INIT RVA: 0x%X - 0x%X]\r\n",
@@ -816,6 +881,7 @@ PatchNtoskrnl(
 	Status = DisablePatchGuard(ImageBase,
 								NtHeaders,
 								InitSection,
+								InitDataSection,
 								TextSection,
 								BuildNumber);
 	if (EFI_ERROR(Status))
