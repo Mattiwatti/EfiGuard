@@ -8,12 +8,11 @@ UINT8 gOslFwpKernelSetupPhase1Backup[sizeof(gHookTemplate)] = { 0 };
 
 
 // Signature for winload!OslFwpKernelSetupPhase1+XX, where the value of XX needs to be determined by backtracking.
-// Windows 10 only. On older OSes, and on Windows 10 as fallback, OslFwpKernelSetupPhase1 is found via xrefs to EfipGetRsdt
+// Windows 10 RS4 and later only. On older OSes, and on Windows 10 as fallback, OslFwpKernelSetupPhase1 is found via xrefs to EfipGetRsdt
 STATIC CONST UINT8 SigOslFwpKernelSetupPhase1[] = {
-	0xE8, 0xCC, 0xCC, 0xCC, 0xCC,					// call BlpArchSwitchContext
-	0x48, 0x8B, 0x05, 0xCC, 0xCC, 0xCC, 0xCC,		// mov rax, gBS
-	0xCC, 0x8B, 0xCC,								// mov rdx, XX
-	0x48, 0x8B, 0x0D, 0xCC, 0xCC, 0xCC, 0xCC		// mov rcx, EfiImageHandle
+	0x89, 0xCC, 0x24, 0x01, 0x00, 0x00,				// mov [REG+124h], r32
+	0xE8, 0xCC, 0xCC, 0xCC, 0xCC,					// call BlBdStop
+	0xCC, 0x8B, 0xCC								// mov r32, r/m32
 };
 
 STATIC UNICODE_STRING ImgpFilterValidationFailureMessage = RTL_CONSTANT_STRING(L"*** Windows is unable to verify the signature of"); // newline, etc etc...
@@ -405,7 +404,7 @@ FindOslFwpKernelSetupPhase1(
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN PEFI_IMAGE_SECTION_HEADER CodeSection,
 	IN PEFI_IMAGE_SECTION_HEADER PatternSection,
-	IN BOOLEAN TryPatternMatch,
+	IN UINT16 BuildNumber,
 	OUT UINT8** OslFwpKernelSetupPhase1Address
 	)
 {
@@ -415,9 +414,9 @@ FindOslFwpKernelSetupPhase1(
 	CONST UINT32 CodeSizeOfRawData = CodeSection->SizeOfRawData;
 	CONST UINT8* PatternStartVa = ImageBase + PatternSection->VirtualAddress;
 
-	if (TryPatternMatch)
+	if (BuildNumber >= 17134)
 	{
-		// On Windows 10, try simple pattern matching first since it will most likely work
+		// On Windows 10 RS4 and later, try simple pattern matching first since it will most likely work
 		UINT8* Found = NULL;
 		CONST EFI_STATUS Status = FindPattern(SigOslFwpKernelSetupPhase1,
 											0xCC,
@@ -437,14 +436,69 @@ FindOslFwpKernelSetupPhase1(
 		}
 	}
 
+	// Initialize Zydis
+	Print(L"\r\n== Disassembling .text to find OslFwpKernelSetupPhase1 ==\r\n");
+	ZYDIS_CONTEXT Context;
+	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
+	if (!ZYAN_SUCCESS(Status))
+	{
+		Print(L"Failed to initialize disassembler engine.\r\n");
+		return EFI_LOAD_ERROR;
+	}
+
+	CONST VOID* BlBdStop = GetProcedureAddress((UINTN)ImageBase, NtHeaders, "BlBdStop");
+	if (BuildNumber >= 17134 && BlBdStop != NULL)
+	{
+		Context.Length = CodeSizeOfRawData;
+		Context.Offset = 6;
+
+		// Start decode loop
+		while ((Context.InstructionAddress = (ZyanU64)(CodeStartVa + Context.Offset),
+				Status = ZydisDecoderDecodeFull(&Context.Decoder,
+												(VOID*)Context.InstructionAddress,
+												Context.Length - Context.Offset,
+												&Context.Instruction,
+												Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
+		{
+			if (!ZYAN_SUCCESS(Status))
+			{
+				Context.Offset++;
+				continue;
+			}
+
+			// Check if this is 'call BlBdStop'
+			if (Context.Instruction.operand_count == 4 &&
+				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && Context.Operands[0].imm.is_relative == ZYAN_TRUE &&
+				Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL)
+			{
+				ZyanU64 OperandAddress = 0;
+				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
+					OperandAddress == (UINTN)BlBdStop)
+				{
+					// Check if the preceding instruction is 'mov [REG+124h], r32'
+					CONST UINT8* CallBlBdStopAddress = (UINT8*)Context.InstructionAddress;
+					if ((CallBlBdStopAddress[-6] == 0x89 || CallBlBdStopAddress[-6] == 0x8B) &&
+						*(UINT32*)(&CallBlBdStopAddress[-4]) == 0x124 &&
+						(*OslFwpKernelSetupPhase1Address = BacktrackToFunctionStart(ImageBase, NtHeaders, CallBlBdStopAddress)) != NULL)
+					{
+						Print(L"    Found OslFwpKernelSetupPhase1 at 0x%llX.\r\n\r\n", (UINTN)(*OslFwpKernelSetupPhase1Address));
+						return EFI_SUCCESS;
+					}
+				}
+			}
+
+			Context.Offset += Context.Instruction.length;
+		}
+	}
+
+	// On RS4 and later, the previous method really should have worked
+	ASSERT(BuildNumber < 17134);
+
 	// On older versions, use some convoluted but robust logic to find OslFwpKernelSetupPhase1 by matching xrefs to EfipGetRsdt.
 	// This of course implies finding EfipGetRsdt first. After that, find all calls to this function, and for each, calculate
 	// the distance from the start of the function to the call. OslFwpKernelSetupPhase1 is reliably (Vista through 10)
 	// the function that has the smallest value for this distance, i.e. the call happens very early in the function.
-	CHAR8 SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME + 1];
-	CopyMem(SectionName, PatternSection->Name, EFI_IMAGE_SIZEOF_SHORT_NAME);
-	SectionName[EFI_IMAGE_SIZEOF_SHORT_NAME] = '\0';
-	Print(L"\r\n== Searching for EfipGetRsdt pattern in %a ==\r\n", SectionName);
+	Print(L"\r\n== Searching for EfipGetRsdt pattern in .text ==\r\n");
 
 	// Search for EFI ACPI 2.0 table GUID: { 8868e871-e4f1-11d3-bc22-0080c73c8881 }
 	UINT8* PatternAddress = NULL;
@@ -468,16 +522,6 @@ FindOslFwpKernelSetupPhase1(
 
 	Print(L"\r\n== Disassembling .text to find EfipGetRsdt ==\r\n");
 	UINT8* LeaEfiAcpiTableGuidAddress = NULL;
-
-	// Initialize Zydis
-	ZYDIS_CONTEXT Context;
-	ZyanStatus Status = ZydisInit(NtHeaders, &Context);
-	if (!ZYAN_SUCCESS(Status))
-	{
-		Print(L"Failed to initialize disassembler engine.\r\n");
-		return EFI_LOAD_ERROR;
-	}
-
 	Context.Length = CodeSizeOfRawData;
 	Context.Offset = 0;
 
@@ -534,7 +578,6 @@ FindOslFwpKernelSetupPhase1(
 	}
 
 	Print(L"    Found EfipGetRsdt at 0x%llX.\r\n", (UINTN)EfipGetRsdt);
-	Print(L"\r\n== Disassembling .text to find OslFwpKernelSetupPhase1 ==\r\n");
 	UINT8* CallEfipGetRsdtAddress = NULL;
 
 	// Start decode loop
@@ -673,7 +716,7 @@ PatchWinload(
 										NtHeaders,
 										CodeSection,
 										PatternSection,
-										BuildNumber >= 10240,
+										BuildNumber,
 										(UINT8**)&gOriginalOslFwpKernelSetupPhase1);
 	if (EFI_ERROR(Status))
 	{
