@@ -31,7 +31,7 @@ STATIC CONST UINT8 SigKeInitAmd64SpecificState[] = {
 // This function is present since Windows 8.1 and is responsible for executing all functions in the KiVerifyXcptRoutines array.
 // One of these functions, KiVerifyXcpt15, will indirectly initialize a PatchGuard context from its exception handler.
 STATIC CONST UINT8 SigKiVerifyScopesExecute[] = {
-	0x48, 0x83, 0xCC, 0xCC, 0x00,								// and [REG+XX], 0
+	0x83, 0xCC, 0xCC, 0x00,										// and d/qword ptr [REG+XX], 0
 	0x48, 0xB8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE	// mov rax, 0FEFFFFFFFFFFFFFFh
 };
 
