@@ -1,0 +1,13 @@
+name: Question
+description: Questions about EfiGuard
+labels: ["question"]
+
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Question description
+      description: What is your question? Please make sure it is related to EfiGuard.
+      placeholder: Ask your question here.
+    validations:
+      required: true

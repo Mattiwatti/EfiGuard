@@ -1,0 +1,54 @@
+name: Bug report
+description: Report bugs or other issues
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: Before filing this bug, [please check if it hasn't already been reported](https://github.com/Mattiwatti/EfiGuard/issues?q=is%3Aissue+label%3Abug). If it has, please add useful information to the existing issue instead.
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 x64 build 22621
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue description
+      description: Briefly describe your issue here.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Describe in small and detailed steps how to reproduce the issue.
+      value: |
+        1. 
+        2. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: If you can provide relevant logs (e.g. of `analyze -v`), please paste them here. The output of `EfiDSEFix -i` is also often helpful when diagnosing EfiGuard issues.
+      placeholder: Paste logs here
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Attachments
+      description: If you can provide crash dumps, photos or screenshots that may help to investigate the issue, please add them here.
+      placeholder: Drag and drop files here
+    validations:
+      required: false

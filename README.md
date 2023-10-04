@@ -8,14 +8,14 @@ EfiGuard is a portable x64 UEFI bootkit that patches the Windows boot manager, b
 - Works passively: the driver does not load or start the Windows boot manager. Instead it acts on a load of `bootmgfw.efi` by the firmware boot manager via the boot selection menu or an EFI application such as the loader. If a non-Windows OS is booted, the driver will automatically unload itself.
 - Supports four-stage patching for when `bootmgfw.efi` starts `bootmgr.efi` rather than `winload.efi`. This is the case when a WIM file is loaded to boot WinPE, Windows Setup or Windows Recovery mode.
 - Graceful recovery: in case of patch failure, the driver will display error information and prompt to continue booting or to reboot by pressing ESC. This is true even up to the final kernel patch stage, because the last patch stage happens before `ExitBootServices` is called. Many UEFI Windows bootkits hook `OslArchTransferToKernel` which, while easy to find by pattern matching, is a function that executes in protected mode after `ExitBootServices`. This means no boot services are available to tell the user that something went wrong.
-  ![bsod](Misc/BSOD.png)
+  ![bsod](.github/img/BSOD.png)
 
   Simulated patch failure with error information
 - Debuggable: can output messages to a kernel debugger and to the screen (albeit buffered) during the kernel patching stage, and to a serial port or unbuffered to the screen during the boot manager and boot loader patching stages. If the driver is compiled with PDB debug information, it is possible to load the debug symbols at any point after HAL initialization by specifying the virtual DXE driver base and debugging it as you would a regular NT driver.
 - DSE bypasses: available as either a straightforward [UPGDSED](https://github.com/hfiref0x/UPGDSED)-style DSE disable at boot time or as a hook on the `SetVariable()` EFI runtime service. The latter serves as an arbitrary kernel mode read/write backdoor that can be called from Windows using `NtSetSystemEnvironmentValueEx` and allows setting `g_CiEnabled`/`g_CiOptions` to the desired value. A small DSEFix-style application named `EfiDSEFix.exe` is provided that can be used to do this. It is also possible to leave DSE enabled and to disable only PatchGuard. The loader will use the `SetVariable` hook method by default, due to the fact that some anti-cheat and anti-virus programs do not understand the difference between cheats or malware and self-signed drivers in general and target the UPGDSED fix.
 - Supports on-disk modified kernels and boot loaders by patching `ImgpValidateImageHash` at every stage as well as `ImgpFilterValidationFailure`, which may silently rat out some classes of violations to a TPM or the SI log file.
 - Allows Secure Boot to work with Windows 7 (not a joke!). Windows 7 itself is oblivious to Secure Boot as it does not support it, or (<a href="https://msdn.microsoft.com/en-us/ie/dn938339(v=vs.60)">officially</a>) even booting without CSM. This is useful for people who want to use Windows 7 on a locked down device that requires WHQL Secure Boot. Wiki entry on how to get this to work [here](https://github.com/Mattiwatti/EfiGuard/wiki/Secure-boot-on-Windows-7).
-  ![win7_secureboot](Misc/Win7SecureBoot.png)
+  ![win7_secureboot](.github/img/Win7SecureBoot.png)
 
   [WinObjEx64](https://github.com/hfiref0x/WinObjEx64) on Windows 7 with Secure Boot enabled
 
@@ -60,7 +60,7 @@ The output binary `EfiDSEFix.exe` will be in `Application/EfiDSEFix/bin`.
 The Visual Studio solution also includes projects for `EfiGuardDxe.efi` and `Loader.efi` which can be used with [VisualUefi](https://github.com/ionescu007/VisualUefi), but these projects are not built by default as they will not link without additional code, and the build output will be inferior (bigger) than what EDK2 produces. `Loader.efi` will not link at all due to VisualUefi missing UefiBootManagerLib. These project files are thus meant as a development aid only and the EFI files should still be compiled with EDK2. To set up VisualUefi for this purpose, clone the repository into `workspace/VisualUefi` and open `EfiGuard.sln`.
 
 # Architecture
-  ![architecture](Misc/EfiGuard.svg)
+  ![architecture](.github/img/EfiGuard.svg)
 While EfiGuard is a UEFI bootkit, it did not start out as one. EfiGuard was originally an on-disk patcher running on NT (similar to [UPGDSED](https://github.com/hfiref0x/UPGDSED)), intended to test the viability of a disassembler-based aproach, as opposed to using PDB symbols and version-specific signatures. [PatchNtoskrnl.c](EfiGuardDxe/PatchNtoskrnl.c) still looks very much like this original design. Only after this approach proved successful, with no modifications to code needed in over a year of Windows updates, did UEFI come into the picture as a way to further improve capabilities and ease of use.
 
 Some of the benefits provided by a bootkit approach include:
