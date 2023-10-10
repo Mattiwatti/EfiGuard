@@ -1,6 +1,8 @@
 # Overview
 EfiGuard is a portable x64 UEFI bootkit that patches the Windows boot manager, boot loader and kernel at boot time in order to disable PatchGuard and Driver Signature Enforcement (DSE).
 
+If you're just looking to try EfiGuard, skip to [Usage](#usage).
+
 # Features
 - Currently supports all EFI-compatible versions of Windows x64 ever released, from Vista SP1 to Windows 11.
 - Easy to use: can be booted from a USB stick or the Windows EFI partition via a loader that automatically finds and boots Windows. The driver can also be loaded and configured manually using either the UEFI shell or the loader.
@@ -23,21 +25,42 @@ EfiGuard is a portable x64 UEFI bootkit that patches the Windows boot manager, b
 - EfiGuard can not disable Hypervisor-enforced Code Integrity (HVCI or HyperGuard) due to HVCI running at a greater privilege level. EfiGuard **can** coexist with HVCI and even successfully disables PatchGuard in the normal kernel, but this is not useful in practice because HVCI will catch what PatchGuard did previously. Both types of DSE bypass are rendered useless by HVCI: the boot time patch has no effect because the kernel defers to the secure kernel for integrity checks, and the `SetVariable` hook will cause a `SECURE_KERNEL_ERROR` bugcheck if it is used to write to `g_CiOptions`.
 - Checked kernels are not supported due to the differences in PatchGuard and DSE initialization code caused by disabled optimizations and added asserts, as well as additional changes to PatchGuard in checked kernels. This should not be an issue as checked kernels are not generally useful without a kernel debugger attached, which disables PatchGuard.
 
-# How to use
-There are two ways to use EfiGuard: booting the loader (easiest), or using the UEFI shell to load the driver. In both cases it is possible to install EfiGuard on a secondary boot medium such as a USB stick or on the EFI system partition. Using the EFI partition has the advantage of not requiring a second boot disk, but this method is more complex to set up. It is advised to try one of the methods below first, and read the instructions in [issue #2](https://github.com/Mattiwatti/EfiGuard/issues/2#issuecomment-478998015) if you want to install EfiGuard on the EFI partition.
-## Booting the loader
-1. Download or compile EfiGuard, go to `EFI/Boot` and rename one of `Loader.efi` or `Loader.config.efi` to `bootx64.efi`. The two are identical, except `Loader.efi` boots without user interaction whereas `Loader.config.efi` will prompt you to configure the DSE patch method used by the driver (if you want to change this).
-2. Place the files on a boot drive such as a USB stick (for physical machines) or an ISO/virtual disk (for VMs). The paths should be `/EFI/Boot/{bootx64|EfiGuardDxe}.efi`. It is recommended to use FAT32 formatted USB sticks.
-3. Boot the machine from the new drive instead of booting Windows. Most firmwares provide a boot menu to do this (accessible via F10/F11/F12). If not, you will need to configure the BIOS to boot from the new drive.
-4. If you are using the default loader, Windows should now boot, and you should see EfiGuard messages during boot. If you are using the configurable loader, answer the configuration prompts and Windows will boot.
-5. If you booted with the `SetVariable` hook (the default), run `EfiDSEFix.exe -d` from a command prompt after boot to disable DSE. Run `EfiDSEFix.exe` to see the full list of options.
+# Usage
+There are two ways to use EfiGuard: booting the **loader application**, which will load the driver and start Windows for you, or installing the driver as a **UEFI driver entry** so it will be loaded automatically by the firmware.
 
-## Using the UEFI shell to load the driver
-1. Follow the steps 1 and 2 as above, but do not rename the loader to `bootx64.efi`. Instead, either use the BIOS-provided shell (if you have one), or download the [EDK2 UEFI Shell](https://github.com/tianocore/edk2/blob/edk2-stable201903/ShellBinPkg/UefiShell/X64/Shell.efi?raw=true) and rename it to `bootx64.efi`.
-2. Boot the machine to the UEFI shell.
-3. `cd` to `/EFI/Boot` on the correct filesystem and run `load EfiGuardDxe.efi` to load the driver.
-4. (Optional) Run either `Loader.efi` or `Loader.config.efi` from the same directory to boot Windows. You can also continue working in the shell, or `exit` to go back to the BIOS/boot menu and boot from there.
-5. After boot, apply the DSE fix as above if applicable.
+Installing the driver can be preferable in some advanced configurations such as when multi-booting, but the loader is easiest to use and should work well in all configurations. See the table below for the most important differences between the two methods. If unsure, choose the **loader application**.
+
+|                   | Location       | Installation   | Skippable?         | Which OS is booted? |
+|-------------------|----------------|----------------|--------------------|---------------------|
+| UEFI Driver Entry | Must be on ESP | Via UEFI Shell | :x:                | Same as before      |
+| Loader            | Anywhere       | Not needed     | :heavy_check_mark: | Windows             |
+
+Loader vs UEFI driver entry comparison
+
+## Booting the loader
+1. Download EfiGuard, go to `EFI/Boot` and rename either `Loader.efi` or `Loader.config.efi` to `bootx64.efi`.
+   The two are identical, except `Loader.config.efi` will prompt to configure the DSE patch method used by the driver before booting.
+2. Place the files on a boot drive such as a FAT32 formatted USB stick (for physical machines) or an ISO/virtual disk (for VMs).
+   Assuming drive `X:`, the paths for the two files should now be `X:/EFI/Boot/{bootx64|EfiGuardDxe}.efi`
+3. Boot the machine from the drive you used in step 2.
+   Most firmwares provide a boot menu to do this via F8/F10/F11/F12. If not, you will need to configure the BIOS to boot from the new drive.
+4. Windows should now boot, and you should see EfiGuard messages during boot.
+5. If you booted with the `SetVariable` hook (the default), run `EfiDSEFix.exe -d` from an Administrator command prompt after boot to disable DSE, or run `EfiDSEFix.exe` to see the full list of options.
+
+Note that you **don't need to use a separate drive** for the loader. If preferable, you can install EfiGuard on the ESP that Windows is already installed on. However, this is somewhat more complicated as you will need to add a UEFI boot entry for the loader.
+
+To do this, mount the ESP at `X:` using `mountvol X: /S` and follow the steps above, but do **not** rename the loader and simply copy both files to `X:/EFI/Boot`. After that, you will need to manually add a UEFI boot entry from the [UEFI Shell](https://github.com/tianocore/edk2/blob/edk2-stable201903/ShellBinPkg/UefiShell/X64/Shell.efi?raw=true) using `bcfg boot addp 0 Loader.efi "EfiGuard"`, or alternatively using `efibootmgr` (Linux), EasyUEFI (Windows), or similar.
+
+## Installing the driver
+1. Mount the ESP at `X:` using `mountvol X: /S`.
+2. Copy `EfiGuardDxe.efi` to `X:/EFI/Boot/EfiGuardDxe.efi`.
+3. Boot to the [UEFI Shell](https://github.com/tianocore/edk2/blob/edk2-stable201903/ShellBinPkg/UefiShell/X64/Shell.efi?raw=true) and add a UEFI driver entry: `bcfg driver add 0 EfiGuardDxe.efi "EfiGuardDxe"`.
+4. Windows should now boot, and you should see EfiGuard messages during boot.
+5. If you booted with the `SetVariable` hook (the default), run `EfiDSEFix.exe -d` from an Administrator command prompt after boot to disable DSE, or run `EfiDSEFix.exe` to see the full list of options.
+
+**Note**: depending on your firmware, you may need to use "add**p**" in step 3 instead of "add". VirtualBox is known to require this, and possibly some motherboard firmwares do too.
+
+**Note**: some very old or noncompliant firmwares may not support this method of installation at all. On these systems you will have no option but to use the loader instead.
 
 # Compilation
 ## Compiling EfiGuardDxe and the loader
