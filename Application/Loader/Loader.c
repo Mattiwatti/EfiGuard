@@ -17,16 +17,6 @@
 
 
 //
-// Define whether the loader should prompt for driver configuration or not.
-// If this is 0, the defaults are used and Windows will be booted with no user interaction.
-// This can be overridden on the command line with -D CONFIGURE_DRIVER=[0|1]
-//
-#ifndef CONFIGURE_DRIVER
-#define CONFIGURE_DRIVER	0
-#endif
-
-
-//
 // Paths to the driver to try
 //
 #define EFIGUARD_DRIVER_FILENAME		L"EfiGuardDxe.efi"
@@ -52,7 +42,19 @@ BmSetMemoryTypeInformationVariable(
 
 
 STATIC
-BOOLEAN
+VOID
+ResetTextInput(
+	VOID
+	)
+{
+	if (mTextInputEx != NULL)
+		mTextInputEx->Reset(mTextInputEx, FALSE);
+	else
+		gST->ConIn->Reset(gST->ConIn, FALSE);
+}
+
+STATIC
+UINT16
 EFIAPI
 WaitForKey(
 	VOID
@@ -70,10 +72,28 @@ WaitForKey(
 		gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
 		gST->ConIn->ReadKeyStroke(gST->ConIn, &KeyData.Key);
 	}
-	return KeyData.Key.ScanCode != SCAN_ESC;
+	return KeyData.Key.ScanCode;
 }
 
-#if CONFIGURE_DRIVER
+STATIC
+UINT16
+EFIAPI
+WaitForKeyWithTimeout(
+	IN UINTN Milliseconds
+	)
+{
+	ResetTextInput();
+	gBS->Stall(Milliseconds * 1000);
+
+	EFI_KEY_DATA KeyData = { 0 };
+	if (mTextInputEx != NULL)
+		mTextInputEx->ReadKeyStrokeEx(mTextInputEx, &KeyData);
+	else
+		gST->ConIn->ReadKeyStroke(gST->ConIn, &KeyData.Key);
+
+	ResetTextInput();
+	return KeyData.Key.ScanCode;
+}
 
 STATIC
 UINT16
@@ -125,9 +145,6 @@ PromptInput(
 	Print(L"%c\r\n\r\n", SelectedChar);
 	return SelectedChar;
 }
-
-#endif
-
 
 // 
 // Try to find a file by browsing each device
@@ -241,9 +258,8 @@ SetHighestAvailableTextMode(
 STATIC
 EFI_STATUS
 EFIAPI
-StartAndConfigureDriver(
-	IN EFI_HANDLE ImageHandle,
-	IN EFI_SYSTEM_TABLE* SystemTable
+StartEfiGuard(
+	IN BOOLEAN InteractiveConfiguration
 	)
 {
 	EFIGUARD_DRIVER_PROTOCOL* EfiGuardDriverProtocol;
@@ -273,7 +289,7 @@ StartAndConfigureDriver(
 
 		EFI_HANDLE DriverHandle = NULL;
 		Status = gBS->LoadImage(FALSE, // Request is not from boot manager
-								ImageHandle,
+								gImageHandle,
 								DriverDevicePath,
 								NULL,
 								0,
@@ -306,41 +322,49 @@ StartAndConfigureDriver(
 		goto Exit;
 	}
 
-#if CONFIGURE_DRIVER
-	//
-	// Interactive driver configuration
-	//
-	Print(L"\r\nChoose the type of DSE bypass to use, or press ENTER for default:\r\n"
-		L"    [1] No DSE bypass\r\n    [2] Boot time DSE bypass\r\n    [3] Runtime SetVariable hook (default)\r\n    ");
-	CONST UINT16 AcceptedDseBypasses[] = { L'1', L'2', L'3' };
-	CONST UINT16 SelectedDseBypass = PromptInput(AcceptedDseBypasses,
-												sizeof(AcceptedDseBypasses) / sizeof(UINT16),
-												L'3');
+	if (InteractiveConfiguration)
+	{
+		//
+		// Interactive driver configuration
+		//
+		Print(L"\r\nChoose the type of DSE bypass to use, or press ENTER for default:\r\n"
+			L"    [1] Runtime SetVariable hook (default)\r\n    [2] Boot time DSE bypass\r\n    [3] No DSE bypass\r\n    ");
+		CONST UINT16 AcceptedDseBypasses[] = { L'1', L'2', L'3' };
+		CONST UINT16 SelectedDseBypass = PromptInput(AcceptedDseBypasses,
+													sizeof(AcceptedDseBypasses) / sizeof(UINT16),
+													L'1');
 
-	Print(L"Wait for a keypress to continue after each patch stage? (for debugging)\n"
-		L"    [1] Yes\r\n    [2] No (default)\r\n    ");
-	CONST UINT16 YesNo[] = { L'1', L'2' };
-	CONST UINT16 SelectedWaitForKeyPress = PromptInput(YesNo,
-											sizeof(YesNo) / sizeof(UINT16),
-											L'2');
+		Print(L"Wait for a keypress to continue after each patch stage?\n"
+			L"    [1] No (default)\r\n    [2] Yes (for debugging)\r\n    ");
+		CONST UINT16 NoYes[] = { L'1', L'2' };
+		CONST UINT16 SelectedWaitForKeyPress = PromptInput(NoYes,
+														sizeof(NoYes) / sizeof(UINT16),
+														L'1');
 
-	EFIGUARD_CONFIGURATION_DATA ConfigData;
-	if (SelectedDseBypass == L'1')
-		ConfigData.DseBypassMethod = DSE_DISABLE_NONE;
-	else if (SelectedDseBypass == L'2')
-		ConfigData.DseBypassMethod = DSE_DISABLE_AT_BOOT;
-	else
-		ConfigData.DseBypassMethod = DSE_DISABLE_SETVARIABLE_HOOK;
-	ConfigData.WaitForKeyPress = (BOOLEAN)(SelectedWaitForKeyPress == L'1');
+		EFIGUARD_CONFIGURATION_DATA ConfigData;
+		switch (SelectedDseBypass)
+		{
+		case L'1':
+		default:
+			ConfigData.DseBypassMethod = DSE_DISABLE_SETVARIABLE_HOOK;
+			break;
+		case L'2':
+			ConfigData.DseBypassMethod = DSE_DISABLE_AT_BOOT;
+			break;
+		case L'3':
+			ConfigData.DseBypassMethod = DSE_DISABLE_NONE;
+			break;
+		}
+		ConfigData.WaitForKeyPress = (BOOLEAN)(SelectedWaitForKeyPress == L'2');
 
-	//
-	// Send the configuration data to the driver
-	//
-	Status = EfiGuardDriverProtocol->Configure(&ConfigData);
+		//
+		// Send the configuration data to the driver
+		//
+		Status = EfiGuardDriverProtocol->Configure(&ConfigData);
 
-	if (EFI_ERROR(Status))
-		Print(L"[LOADER] Driver Configure() returned error %llx (%r).\r\n", Status, Status);
-#endif
+		if (EFI_ERROR(Status))
+			Print(L"[LOADER] Driver Configure() returned error %llx (%r).\r\n", Status, Status);
+	}
 
 Exit:
 	if (DriverDevicePath != NULL)
@@ -610,16 +634,23 @@ UefiMain(
 	gBS->HandleProtocol(gST->ConsoleInHandle, &gEfiSimpleTextInputExProtocolGuid, (VOID **)&mTextInputEx);
 
 	//
+	// Allow user to configure the driver by pressing a hotkey
+	//
+	Print(L"Press <HOME> to configure EfiGuard...\r\n");
+	CONST BOOLEAN InteractiveConfiguration = WaitForKeyWithTimeout(1500) == SCAN_HOME;
+
+	//
 	// Locate, load, start and configure the driver
 	//
-	CONST EFI_STATUS DriverStatus = StartAndConfigureDriver(ImageHandle, SystemTable);
+	CONST EFI_STATUS DriverStatus = StartEfiGuard(InteractiveConfiguration);
 	if (EFI_ERROR(DriverStatus))
 	{
 		Print(L"\r\nERROR: driver load failed with status %llx (%r).\r\n"
 			L"Press any key to continue, or press ESC to return to the firmware or shell.\r\n",
 			DriverStatus, DriverStatus);
-		if (!WaitForKey())
+		if (WaitForKey() == SCAN_ESC)
 		{
+			gBS->Exit(gImageHandle, DriverStatus, 0, NULL);
 			return DriverStatus;
 		}
 	}

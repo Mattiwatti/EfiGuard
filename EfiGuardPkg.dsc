@@ -81,9 +81,6 @@
 
 [BuildOptions.Common]
   *_*_*_CC_FLAGS = -D DISABLE_NEW_DEPRECATED_INTERFACES
-!if $(CONFIGURE_DRIVER) == 1
-  *_*_*_CC_FLAGS = -D CONFIGURE_DRIVER=1
-!endif
 
   # Source files are UTF-8 without BOM. MSVC will convert other encodings to this without asking, so this is not really a choice
   MSFT:*_*_*_CC_FLAGS = /utf-8
