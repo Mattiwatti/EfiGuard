@@ -38,8 +38,7 @@ Installing the driver can be preferable in some advanced configurations such as 
 Loader vs UEFI driver entry comparison
 
 ## Booting the loader
-1. Download EfiGuard, go to `EFI/Boot` and rename either `Loader.efi` or `Loader.config.efi` to `bootx64.efi`.
-   The two are identical, except `Loader.config.efi` will prompt to configure the DSE patch method used by the driver before booting.
+1. Download EfiGuard and rename `EFI/Boot/Loader.efi` to `bootx64.efi`.
 2. Place the files on a boot drive such as a FAT32 formatted USB stick (for physical machines) or an ISO/virtual disk (for VMs).
    Assuming drive `X:`, the paths for the two files should now be `X:/EFI/Boot/{bootx64|EfiGuardDxe}.efi`
 3. Boot the machine from the drive you used in step 2.
@@ -69,14 +68,11 @@ EfiGuard requires EDK2 to build. If you don't have EDK2 installed, follow the st
 2. Open a prompt or shell that sets up the environment variables for EDK2.
 3. Run `build -a X64 -t VS2019 -p EfiGuardPkg/EfiGuardPkg.dsc -b RELEASE`, substituting your toolchain for VS2019.
 
-
 This will produce `EfiGuardDxe.efi` and `Loader.efi` in `workspace/Build/EfiGuard/RELEASE_VS2019/X64`.
-To build the interactively configurable loader, append `-D CONFIGURE_DRIVER=1` to the build command.
 
 ## Compiling EfiDSEFix
 EfiDSEFix requires Visual Studio to build.
 1. Open `EfiGuard.sln` and build the solution.
-
 
 The output binary `EfiDSEFix.exe` will be in `Application/EfiDSEFix/bin`.
 
