@@ -31,11 +31,11 @@ FindKernelModule(
 
 	for (ULONG i = 0; i < Modules->NumberOfModules; ++i)
 	{
-		RTL_PROCESS_MODULE_INFORMATION Module = Modules->Modules[i];
-		if (_stricmp(ModuleName, reinterpret_cast<PCHAR>(Module.FullPathName) + Module.OffsetToFileName) == 0)
+		const PRTL_PROCESS_MODULE_INFORMATION Module = &Modules->Modules[i];
+		if (_stricmp(ModuleName, reinterpret_cast<PCHAR>(Module->FullPathName) + Module->OffsetToFileName) == 0)
 		{
-			*ModuleBase = reinterpret_cast<ULONG_PTR>(Module.ImageBase);
-			Status = Module.ImageBase == nullptr ? STATUS_NOT_FOUND : STATUS_SUCCESS;
+			*ModuleBase = reinterpret_cast<ULONG_PTR>(Module->ImageBase);
+			Status = Module->ImageBase == nullptr ? STATUS_NOT_FOUND : STATUS_SUCCESS;
 			break;
 		}
 	}
@@ -48,7 +48,7 @@ Exit:
 // For Windows Vista/7. Credits: DSEFix by hfiref0x
 static
 LONG
-QueryCiEnabled(
+FindCiEnabled(
 	_In_ PVOID MappedBase,
 	_In_ SIZE_T SizeOfImage,
 	_In_ ULONG_PTR KernelBase,
@@ -73,7 +73,7 @@ QueryCiEnabled(
 // For Windows 8 and worse. Credits: DSEFix by hfiref0x
 static
 LONG
-QueryCiOptions(
+FindCiOptions(
 	_In_ PVOID MappedBase,
 	_In_ ULONG_PTR CiDllBase,
 	_Out_ PULONG_PTR gCiOptionsAddress
@@ -183,34 +183,8 @@ QueryCiOptions(
 }
 
 static
-BOOLEAN
-QueryVbsEnabled(
-	)
-{
-	SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrityInfo = { sizeof(SYSTEM_CODEINTEGRITY_INFORMATION) };
-	NTSTATUS Status = NtQuerySystemInformation(SystemCodeIntegrityInformation,
-												&CodeIntegrityInfo,
-												sizeof(CodeIntegrityInfo),
-												nullptr);
-	if (NT_SUCCESS(Status) &&
-		(CodeIntegrityInfo.CodeIntegrityOptions & (CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED | CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED)) != 0)
-		return TRUE;
-
-	SYSTEM_ISOLATED_USER_MODE_INFORMATION IumInfo = { 0 };
-	Status = NtQuerySystemInformation(SystemIsolatedUserModeInformation,
-									&IumInfo,
-									sizeof(IumInfo),
-									nullptr);
-	if (NT_SUCCESS(Status) &&
-		(IumInfo.SecureKernelRunning || IumInfo.HvciEnabled))
-		return TRUE;
-
-	return FALSE;
-}
-
-static
 NTSTATUS
-AnalyzeCi(
+FindCiOptionsVariable(
 	_Out_ PVOID *CiOptionsAddress
 	)
 {
@@ -243,7 +217,7 @@ AnalyzeCi(
 			goto Exit;
 
 		ULONG_PTR gCiOptionsAddress;
-		const LONG Relative = QueryCiOptions(MappedBase, CiDllBase, &gCiOptionsAddress);
+		const LONG Relative = FindCiOptions(MappedBase, CiDllBase, &gCiOptionsAddress);
 		if (Relative != 0)
 		{
 			*CiOptionsAddress = reinterpret_cast<PVOID>(gCiOptionsAddress);
@@ -263,7 +237,7 @@ AnalyzeCi(
 			goto Exit;
 
 		ULONG_PTR gCiEnabledAddress;
-		const LONG Relative = QueryCiEnabled(MappedBase, ViewSize, KernelBase, &gCiEnabledAddress);
+		const LONG Relative = FindCiEnabled(MappedBase, ViewSize, KernelBase, &gCiEnabledAddress);
 		if (Relative != 0)
 		{
 			*CiOptionsAddress = reinterpret_cast<PVOID>(gCiEnabledAddress);
@@ -281,47 +255,29 @@ Exit:
 }
 
 static
-NTSTATUS
-SetSystemEnvironmentPrivilege(
-	_In_ BOOLEAN Enable,
-	_Out_opt_ PBOOLEAN WasEnabled
+BOOLEAN
+IsVbsEnabled(
 	)
 {
-	if (WasEnabled != nullptr)
-		*WasEnabled = FALSE;
+	SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrityInfo = { sizeof(SYSTEM_CODEINTEGRITY_INFORMATION) };
+	NTSTATUS Status = NtQuerySystemInformation(SystemCodeIntegrityInformation,
+												&CodeIntegrityInfo,
+												sizeof(CodeIntegrityInfo),
+												nullptr);
+	if (NT_SUCCESS(Status) &&
+		(CodeIntegrityInfo.CodeIntegrityOptions & (CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED | CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED)) != 0)
+		return TRUE;
 
-	BOOLEAN SeSystemEnvironmentWasEnabled;
-	const NTSTATUS Status = RtlAdjustPrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE,
-												Enable,
-												FALSE,
-												&SeSystemEnvironmentWasEnabled);
+	SYSTEM_ISOLATED_USER_MODE_INFORMATION IumInfo = { 0 };
+	Status = NtQuerySystemInformation(SystemIsolatedUserModeInformation,
+									&IumInfo,
+									sizeof(IumInfo),
+									nullptr);
+	if (NT_SUCCESS(Status) &&
+		(IumInfo.SecureKernelRunning || IumInfo.HvciEnabled))
+		return TRUE;
 
-	if (NT_SUCCESS(Status) && WasEnabled != nullptr)
-		*WasEnabled = SeSystemEnvironmentWasEnabled;
-
-	return Status;
-}
-
-static
-NTSTATUS
-SetDebugPrivilege(
-	_In_ BOOLEAN Enable,
-	_Out_opt_ PBOOLEAN WasEnabled
-	)
-{
-	if (WasEnabled != nullptr)
-		*WasEnabled = FALSE;
-
-	BOOLEAN SeDebugWasEnabled;
-	const NTSTATUS Status = RtlAdjustPrivilege(SE_DEBUG_PRIVILEGE,
-												Enable,
-												FALSE,
-												&SeDebugWasEnabled);
-
-	if (NT_SUCCESS(Status) && WasEnabled != nullptr)
-		*WasEnabled = SeDebugWasEnabled;
-
-	return Status;
+	return FALSE;
 }
 
 NTSTATUS
@@ -330,24 +286,9 @@ TestSetVariableHook(
 {
 	UINT16 Mz;
 
-	// Enable privileges in case we were called directly from the CLI with --check
-	BOOLEAN SeSystemEnvironmentWasEnabled, SeDebugWasEnabled;
-	NTSTATUS Status = SetSystemEnvironmentPrivilege(TRUE, &SeSystemEnvironmentWasEnabled);
-	if (!NT_SUCCESS(Status))
+	if (IsVbsEnabled())
 	{
-		Printf(L"Fatal error: failed to acquire SE_SYSTEM_ENVIRONMENT_PRIVILEGE. Make sure you are running as administrator.\n");
-		return Status;
-	}
-	Status = SetDebugPrivilege(TRUE, &SeDebugWasEnabled);
-	if (!NT_SUCCESS(Status))
-	{
-		Printf(L"Fatal error: failed to acquire SE_DEBUG_PRIVILEGE. Make sure you are running as administrator.\n");
-		return Status;
-	}
-
-	if (QueryVbsEnabled())
-	{
-		Printf(L"Fatal error: VBS (Virtualization Based Security) is enabled and running on this system.\n"
+		Printf(L"Error: VBS (Virtualization Based Security) is enabled and running on this system.\n"
 			"Attempting to read or write to or from kernel space using EFI runtime services will result in a bugcheck.\n"
 			"Either the EfiGuard DXE driver is not loaded, or it failed to disable VBS during boot.\n"
 			"Not continuing.\n");
@@ -356,11 +297,11 @@ TestSetVariableHook(
 
 	// Find some kernel address to read
 	ULONG_PTR HalBase;
-	Status = FindKernelModule("hal.dll", &HalBase);
+	NTSTATUS Status = FindKernelModule("hal.dll", &HalBase);
 	if (!NT_SUCCESS(Status))
 		return Status;
 
-	// Set up the struct for a backdoor kernel mode read. See TriggerExploit for explanations
+	// Set up the struct for a backdoor kernel mode read. See WriteToCiOptions for explanations
 	EFIGUARD_BACKDOOR_DATA BackdoorData;
 	RtlZeroMemory(&BackdoorData, sizeof(BackdoorData));
 	BackdoorData.CookieValue = EFIGUARD_BACKDOOR_COOKIE_VALUE;
@@ -396,7 +337,7 @@ TestSetVariableHook(
 	if (!NT_SUCCESS(Status))
 	{
 		Printf(L"The EfiGuard DXE driver is either not loaded in SETVARIABLE_HOOK mode, or it is malfunctioning.\n");
-		goto Exit;
+		return Status;
 	}
 
 	// Check if hal.dll still starts with "MZ"
@@ -408,16 +349,12 @@ TestSetVariableHook(
 		Status = STATUS_INVALID_IMAGE_NOT_MZ; // Literally
 	}
 
-Exit:
-	SetSystemEnvironmentPrivilege(SeSystemEnvironmentWasEnabled, nullptr);
-	SetDebugPrivilege(SeDebugWasEnabled, nullptr);
-
 	return Status;
 }
 
 static
 NTSTATUS
-TriggerExploit(
+WriteToCiOptions(
 	_In_ PVOID CiVariableAddress,
 	_In_ ULONG CiOptionsValue,
 	_Out_opt_ PULONG OldCiOptionsValue,
@@ -486,38 +423,18 @@ AdjustCiOptions(
 	if (OldCiOptionsValue != nullptr)
 		*OldCiOptionsValue = CODEINTEGRITY_OPTION_ENABLED;
 
-	// Enable privileges
-	BOOLEAN SeSystemEnvironmentWasEnabled, SeDebugWasEnabled;
-	NTSTATUS Status = SetSystemEnvironmentPrivilege(TRUE, &SeSystemEnvironmentWasEnabled);
-	if (!NT_SUCCESS(Status))
-	{
-		Printf(L"Fatal error: failed to acquire SE_SYSTEM_ENVIRONMENT_PRIVILEGE. Make sure you are running as administrator.\n");
-		return Status;
-	}
-	Status = SetDebugPrivilege(TRUE, &SeDebugWasEnabled);
-	if (!NT_SUCCESS(Status))
-	{
-		Printf(L"Fatal error: failed to acquire SE_DEBUG_PRIVILEGE. Make sure you are running as administrator.\n");
-		return Status;
-	}
-
 	// Find CI!g_CiOptions/nt!g_CiEnabled
 	PVOID CiOptionsAddress;
-	Status = AnalyzeCi(&CiOptionsAddress);
+	NTSTATUS Status = FindCiOptionsVariable(&CiOptionsAddress);
 	if (!NT_SUCCESS(Status))
 		return Status;
 
 	Printf(L"%ls at 0x%p.\n", (NtCurrentPeb()->OSBuildNumber >= 9200 ? L"CI!g_CiOptions" : L"nt!g_CiEnabled"), CiOptionsAddress);
 
 	// Enable/disable CI
-	Status = TriggerExploit(CiOptionsAddress,
+	Status = WriteToCiOptions(CiOptionsAddress,
 							CiOptionsValue,
 							OldCiOptionsValue,
 							ReadOnly);
-
-	// Revert privileges
-	SetSystemEnvironmentPrivilege(SeSystemEnvironmentWasEnabled, nullptr);
-	SetDebugPrivilege(SeDebugWasEnabled, nullptr);
-
 	return Status;
 }

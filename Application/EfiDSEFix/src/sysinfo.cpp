@@ -75,10 +75,10 @@ DumpSystemInformation(
 			Printf(L"SystemModuleInformation: %08lX\n\n", Status);
 		else
 		{
-			const RTL_PROCESS_MODULE_INFORMATION Ntoskrnl = ModuleInfo->Modules[0];
+			const PRTL_PROCESS_MODULE_INFORMATION Ntoskrnl = &ModuleInfo->Modules[0];
 			Printf(L"SystemModuleInformation:\n\t- Kernel: %S (%S)\n\n",
-				reinterpret_cast<PCCH>(Ntoskrnl.FullPathName + Ntoskrnl.OffsetToFileName),
-				reinterpret_cast<PCCH>(Ntoskrnl.FullPathName));
+				reinterpret_cast<PCCH>(Ntoskrnl->FullPathName + Ntoskrnl->OffsetToFileName),
+				reinterpret_cast<PCCH>(Ntoskrnl->FullPathName));
 		}
 		RtlFreeHeap(RtlProcessHeap(), 0, ModuleInfo);
 	}

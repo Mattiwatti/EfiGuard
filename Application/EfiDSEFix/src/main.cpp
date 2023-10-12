@@ -9,13 +9,13 @@ PrintUsage(
 {
 	const BOOLEAN Win8OrHigher = (RtlNtMajorVersion() >= 6 && RtlNtMinorVersion() >= 2) || RtlNtMajorVersion() > 6;
 	const PCWCHAR CiOptionsName = Win8OrHigher ? L"g_CiOptions" : L"g_CiEnabled";
-	Printf(L"\nUsage: %ls [COMMAND]\n\n"
-		L"Commands:\n\n"
-		L"-c, --check%17lsTest backdoor hook\n"
-		L"-r, --read%18lsRead current %ls value\n"
-		L"-d, --disable%15lsDisable DSE\n"
-		L"-e, --enable%ls%2ls(Re)enable DSE\n"
-		L"-i, --info%18lsDump system info\n",
+	Printf(L"\nUsage: %ls <COMMAND>\n\n"
+		L"Commands:\n"
+		L"    -c, --check%17lsTest EFI SetVariable hook\n"
+		L"    -r, --read%18lsRead current %ls value\n"
+		L"    -d, --disable%15lsDisable DSE\n"
+		L"    -e, --enable%ls%2ls(Re)enable DSE\n"
+		L"    -i, --info%18lsDump system info\n",
 		ProgramName, L"", L"",
 		CiOptionsName, L"",
 		(Win8OrHigher ? L" [g_CiOptions]" : L"              "),
@@ -26,12 +26,29 @@ int wmain(int argc, wchar_t** argv)
 {
 	NT_ASSERT(argc != 0);
 
-	if (argc == 1 || argc > 3 ||
-		(argc == 3 && wcstoul(argv[2], nullptr, 16) == 0))
+	if (argc <= 1 || argc > 3 ||
+		(argc == 3 && wcstoul(argv[2], nullptr, 16) == 0) ||
+		wcsncmp(argv[1], L"-h", sizeof(L"-h") / sizeof(WCHAR) - 1) == 0 ||
+		wcsncmp(argv[1], L"--help", sizeof(L"--help") / sizeof(WCHAR) - 1) == 0)
 	{
 		// Print help text
 		PrintUsage(argv[0]);
 		return 0;
+	}
+
+	// All remaining commands require admin privileges
+	BOOLEAN SeSystemEnvironmentWasEnabled, SeDebugWasEnabled;
+	NTSTATUS Status = RtlAdjustPrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, TRUE, FALSE, &SeSystemEnvironmentWasEnabled);
+	if (!NT_SUCCESS(Status))
+	{
+		Printf(L"Error: failed to acquire SE_SYSTEM_ENVIRONMENT_PRIVILEGE.\n%ls must be run as Administrator.\n", argv[0]);
+		return Status;
+	}
+	Status = RtlAdjustPrivilege(SE_DEBUG_PRIVILEGE, TRUE, FALSE, &SeDebugWasEnabled);
+	if (!NT_SUCCESS(Status))
+	{
+		Printf(L"Error: failed to acquire SE_DEBUG_PRIVILEGE.\n%ls must be run as Administrator.\n", argv[0]);
+		return Status;
 	}
 
 	// Parse command line params
@@ -41,15 +58,6 @@ int wmain(int argc, wchar_t** argv)
 	ULONG CiOptionsValue;
 	BOOLEAN ReadOnly = FALSE;
 
-	if (wcsncmp(argv[1], L"-c", sizeof(L"-c") / sizeof(WCHAR) - 1) == 0 ||
-		wcsncmp(argv[1], L"--check", sizeof(L"--check") / sizeof(WCHAR) - 1) == 0)
-	{
-		Printf(L"Checking for working EFI SetVariable() backdoor...\n");
-		const NTSTATUS Status = TestSetVariableHook();
-		if (NT_SUCCESS(Status)) // Any errors have already been printed
-			Printf(L"Success!\n");
-		return Status;
-	}
 	if (wcsncmp(argv[1], L"-r", sizeof(L"-r") / sizeof(WCHAR) - 1) == 0 ||
 		wcsncmp(argv[1], L"--read", sizeof(L"--read") / sizeof(WCHAR) - 1) == 0)
 	{
@@ -77,20 +85,31 @@ int wmain(int argc, wchar_t** argv)
 			Printf(L"(Re)enabling DSE...\n");
 		}
 	}
+	else if (wcsncmp(argv[1], L"-c", sizeof(L"-c") / sizeof(WCHAR) - 1) == 0 ||
+		wcsncmp(argv[1], L"--check", sizeof(L"--check") / sizeof(WCHAR) - 1) == 0)
+	{
+		Printf(L"Checking for working EFI SetVariable hook...\n");
+		Status = TestSetVariableHook();
+		if (NT_SUCCESS(Status)) // Any errors have already been printed
+			Printf(L"Success.\n");
+		goto Exit;
+	}
 	else if (wcsncmp(argv[1], L"-i", sizeof(L"-i") / sizeof(WCHAR) - 1) == 0 ||
 		wcsncmp(argv[1], L"--info", sizeof(L"--info") / sizeof(WCHAR) - 1) == 0)
 	{
-		return DumpSystemInformation();
+		Status = DumpSystemInformation();
+		goto Exit;
 	}
 	else
 	{
 		PrintUsage(argv[0]);
-		return STATUS_INVALID_PARAMETER;
+		Status = STATUS_INVALID_PARAMETER;
+		goto Exit;
 	}
 
-	// Trigger EFI driver exploit and write new value to g_CiOptions/g_CiEnabled
+	// Call EFI runtime SetVariable service and write new value to g_CiOptions/g_CiEnabled
 	ULONG OldCiOptionsValue;
-	const NTSTATUS Status = AdjustCiOptions(CiOptionsValue, &OldCiOptionsValue, ReadOnly);
+	Status = AdjustCiOptions(CiOptionsValue, &OldCiOptionsValue, ReadOnly);
 
 	// Print result
 	if (!NT_SUCCESS(Status))
@@ -105,6 +124,11 @@ int wmain(int argc, wchar_t** argv)
 			Printf(L"Successfully %ls DSE. Original", CiOptionsValue == 0 ? L"disabled" : L"(re)enabled");
 		Printf(L" %ls value: 0x%lX\n", CiOptionsName, OldCiOptionsValue);
 	}
+
+Exit:
+	RtlAdjustPrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, SeSystemEnvironmentWasEnabled, FALSE, &SeSystemEnvironmentWasEnabled);
+	RtlAdjustPrivilege(SE_DEBUG_PRIVILEGE, SeDebugWasEnabled, FALSE, &SeDebugWasEnabled);
+
 	return Status;
 }
 
