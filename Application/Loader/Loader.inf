@@ -21,6 +21,7 @@
   UefiBootServicesTableLib
   DebugLib
   UefiLib
+  ReportStatusCodeLib
   DevicePathLib
   PrintLib
   UefiBootManagerLib
@@ -28,6 +29,8 @@
 [Guids]
   ## SOMETIMES_PRODUCES ## Variable:L"BootCurrent" (The boot option of current boot)
   gEfiGlobalVariableGuid
+  ## SOMETIMES_PRODUCES ## Variable:L"MemoryTypeInformation."
+  gEfiMemoryTypeInformationGuid                    ## SOMETIMES_PRODUCES
   gEfiEventReadyToBootGuid                         ## SOMETIMES_PRODUCES
   gEfiHobListGuid                                  ## CONSUMES
   gEfiDxeServicesTableGuid                         ## CONSUMES
@@ -54,6 +57,11 @@
   gEfiSimpleTextInProtocolGuid                     ## CONSUMES
   gEfiSimpleTextOutProtocolGuid                    ## CONSUMES
   gEfiLegacyBiosProtocolGuid                       ## CONSUMES
+
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdResetOnMemoryTypeInformationChange    ## SOMETIMES_CONSUMES
+  gEfiMdeModulePkgTokenSpaceGuid.PcdProgressCodeOsLoaderLoad              ## SOMETIMES_CONSUMES
+  gEfiMdeModulePkgTokenSpaceGuid.PcdProgressCodeOsLoaderStart             ## SOMETIMES_CONSUMES
 
 [BuildOptions.Common]
   *:DEBUG_*_*_PP_FLAGS = -D EFI_DEBUG

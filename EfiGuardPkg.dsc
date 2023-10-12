@@ -65,6 +65,13 @@
   VariablePolicyHelperLib|MdeModulePkg/Library/VariablePolicyHelperLib/VariablePolicyHelperLib.inf
   UefiBootManagerLib|MdeModulePkg/Library/UefiBootManagerLib/UefiBootManagerLib.inf
 
+[PcdsFixedAtBuild]
+  # Enable error and progress status code reporting
+  gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x03
+
+  # See https://edk2-devel.narkive.com/sSVnhXxV/edk2-bdssetmemorytypeinformationvariable
+  gEfiMdeModulePkgTokenSpaceGuid.PcdResetOnMemoryTypeInformationChange|FALSE
+
 [Components]
   # DXE driver
   EfiGuardPkg/EfiGuardDxe/EfiGuardDxe.inf

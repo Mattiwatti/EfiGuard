@@ -5,9 +5,11 @@
 #include <Protocol/SimpleFileSystem.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/LegacyBios.h>
+#include <Library/PcdLib.h>
 #include <Library/UefiLib.h>
 #include <Library/DebugLib.h>
 #include <Library/MemoryAllocationLib.h>
+#include <Library/ReportStatusCodeLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiBootManagerLib.h>
@@ -34,6 +36,12 @@ STATIC CHAR16* mDriverPaths[] = {
 	L"\\" EFIGUARD_DRIVER_FILENAME
 };
 
+
+VOID
+EFIAPI
+BmRepairAllControllers(
+	IN UINTN ReconnectRepairCount
+	);
 
 VOID
 EFIAPI
@@ -448,6 +456,13 @@ TryBootOptionsInOrder(
 
 		// Signal the EVT_SIGNAL_READY_TO_BOOT event
 		EfiSignalEventReadyToBoot();
+		REPORT_STATUS_CODE(EFI_PROGRESS_CODE, (EFI_SOFTWARE_DXE_BS_DRIVER | EFI_SW_DXE_BS_PC_READY_TO_BOOT_EVENT));
+
+		// Repair system through DriverHealth protocol
+		BmRepairAllControllers(0);
+
+		// Save the memory map in the MemoryTypeInformation variable for resuming from ACPI S4 (hibernate)
+		BmSetMemoryTypeInformationVariable((BootOptions[Index].Attributes & LOAD_OPTION_CATEGORY) == LOAD_OPTION_CATEGORY_BOOT);
 
 		// Handle BBS entries
 		if (IsLegacy)
@@ -469,18 +484,12 @@ TryBootOptionsInOrder(
 			return !EFI_ERROR(BootOptions[Index].Status);
 		}
 
-		// So again, DO NOT call this abortion:
-		//BmSetMemoryTypeInformationVariable((BOOLEAN)((BootOptions[Index].Attributes & LOAD_OPTION_CATEGORY) == LOAD_OPTION_CATEGORY_BOOT));
-		//
-		// OK, maybe call it after all, but pretend this is *not* a boot entry, so that the system will not go into an infinite boot (reset) loop.
-		// This may or may not fix hibernation related issues (S4 entry/resume). See https://github.com/Mattiwatti/EfiGuard/issues/12
-		BmSetMemoryTypeInformationVariable(FALSE);
-
 		// Ensure the image path is connected end-to-end by Dispatch()ing any required drivers through DXE services
 		EfiBootManagerConnectDevicePath(BootOptions[Index].FilePath, NULL);
 
 		// Instead of creating a ramdisk and reading the file into it (¿que?), just pass the path we saved earlier.
 		// This is the point where the driver kicks in via its LoadImage hook.
+		REPORT_STATUS_CODE(EFI_PROGRESS_CODE, PcdGet32(PcdProgressCodeOsLoaderLoad));
 		EFI_HANDLE ImageHandle = NULL;
 		Status = gBS->LoadImage(TRUE,
 								gImageHandle,
@@ -499,6 +508,7 @@ TryBootOptionsInOrder(
 				gBS->UnloadImage(ImageHandle);
 
 			Print(L"LoadImage error %llx (%r)\r\n", Status, Status);
+			BootOptions[Index].Status = Status;
 			continue;
 		}
 
@@ -523,6 +533,7 @@ TryBootOptionsInOrder(
 		gBS->SetWatchdogTimer((UINTN)(5 * 60), 0x0000, 0x00, NULL);
 
 		// Start the image and set the return code in the boot option status
+		REPORT_STATUS_CODE(EFI_PROGRESS_CODE, PcdGet32(PcdProgressCodeOsLoaderStart));
 		Status = gBS->StartImage(ImageHandle,
 								&BootOptions[Index].ExitDataSize,
 								&BootOptions[Index].ExitData);

@@ -25,7 +25,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CONFIGURE_DRIVER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CONFIGURE_DRIVER=1;_PCD_GET_MODE_32_PcdProgressCodeOsLoaderLoad=0x3058000;_PCD_GET_MODE_32_PcdProgressCodeOsLoaderStart=0x3058001;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)Include;$(EDK_PATH)\OvmfPkg\Csm\Include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
