@@ -54,6 +54,7 @@ EFI_HANDLE gBootmgfwHandle = NULL;
 //
 // EFI runtime globals
 //
+EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL* gTextInputEx = NULL;
 EFI_EVENT gEfiExitBootServicesEvent = NULL;
 BOOLEAN gEfiAtRuntime = FALSE;
 EFI_EVENT gEfiVirtualNotifyEvent = NULL;
@@ -565,6 +566,11 @@ EfiGuardInitialize(
 		Print(L"Failed to install EFI Driver Supported Version protocol. Error: %llx (%r)\r\n", Status, Status);
 		return Status;
 	}
+
+	//
+	// Query the console input handle for the Simple Text Input Ex protocol
+	//
+	gBS->HandleProtocol(gST->ConsoleInHandle, &gEfiSimpleTextInputExProtocolGuid, (VOID **)&gTextInputEx);
 
 	//
 	// Install EfiGuard driver protocol

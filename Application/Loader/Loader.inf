@@ -55,6 +55,7 @@
   gEfiUsbIoProtocolGuid                            ## CONSUMES
   gEfiFirmwareVolume2ProtocolGuid                  ## CONSUMES
   gEfiSimpleTextInProtocolGuid                     ## CONSUMES
+  gEfiSimpleTextInputExProtocolGuid                ## CONSUMES
   gEfiSimpleTextOutProtocolGuid                    ## CONSUMES
   gEfiLegacyBiosProtocolGuid                       ## CONSUMES
 

@@ -53,6 +53,8 @@
   gEfiDevicePathUtilitiesProtocolGuid              ## CONSUMES
   gEfiLoadedImageProtocolGuid                      ## CONSUMES
   gEfiShellProtocolGuid                            ## SOMETIMES_CONSUMES
+  gEfiSimpleTextInProtocolGuid                     ## SOMETIMES_CONSUMES
+  gEfiSimpleTextInputExProtocolGuid                ## SOMETIMES_CONSUMES
 
 [Guids]
   gEfiGlobalVariableGuid                           ## SOMETIMES_PRODUCES

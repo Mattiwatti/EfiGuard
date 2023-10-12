@@ -36,6 +36,11 @@ extern EFIGUARD_CONFIGURATION_DATA gDriverConfig;
 extern EFI_HANDLE gBootmgfwHandle;
 
 //
+// Simple Text Input Ex protocol pointer. May be NULL
+//
+extern EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL* gTextInputEx;
+
+//
 // TRUE if ExitBootServices() has been called
 //
 extern BOOLEAN gEfiAtRuntime;

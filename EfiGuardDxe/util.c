@@ -231,27 +231,28 @@ WaitForKey(
 	)
 {
 	// Hack: because we call this at TPL_NOTIFY in ExitBootServices, we cannot use WaitForEvent()
-	// in that scenario because it requires TPL == TPL_APPLICATION. So check the TPL
+	// in that scenario because it requires TPL <= TPL_APPLICATION. So check the TPL
 	CONST EFI_TPL Tpl = EfiGetCurrentTpl();
 
-	EFI_INPUT_KEY Key = { 0, 0 };
+	EFI_KEY_DATA KeyData = { 0 };
 	EFI_STATUS Status = EFI_NOT_READY;
 
 	while (Status == EFI_NOT_READY)
 	{
-		// Can we call WaitForEvent()?
 		UINTN Index = 0;
-		if (Tpl == TPL_APPLICATION)
-			gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index); // Yep
+		if (Tpl <= TPL_APPLICATION)
+			gBS->WaitForEvent(1, gTextInputEx != NULL ? gTextInputEx->WaitForKeyEx : &gST->ConIn->WaitForKey, &Index);
 		else
-			RtlStall(1); // Nope; burn CPU. // TODO: find a way to parallelize this to achieve GeForce FX 5800 temperatures
+			RtlStall(1); // WaitForEvent() unavailable, burn CPU
 
 		// At TPL_APPLICATION, we will always get EFI_SUCCESS (barring hardware failures). At higher TPLs we may also get EFI_NOT_READY
-		Status = gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);
+		Status = gTextInputEx != NULL
+			? gTextInputEx->ReadKeyStrokeEx(gTextInputEx, &KeyData)
+			: gST->ConIn->ReadKeyStroke(gST->ConIn, &KeyData.Key);
 	}
 
 	ASSERT_EFI_ERROR(Status);
-	return (BOOLEAN)(Key.ScanCode != SCAN_ESC);
+	return KeyData.Key.ScanCode != SCAN_ESC;
 }
 
 INT32

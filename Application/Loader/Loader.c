@@ -36,6 +36,7 @@ STATIC CHAR16* mDriverPaths[] = {
 	L"\\" EFIGUARD_DRIVER_FILENAME
 };
 
+STATIC EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *mTextInputEx = NULL;
 
 VOID
 EFIAPI
@@ -57,12 +58,19 @@ WaitForKey(
 	VOID
 	)
 {
-	EFI_INPUT_KEY Key = { 0, 0 };
+	EFI_KEY_DATA KeyData = { 0 };
 	UINTN Index = 0;
-	gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
-	gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);
-
-	return Key.ScanCode != SCAN_ESC;
+	if (mTextInputEx != NULL)
+	{
+		gBS->WaitForEvent(1, &mTextInputEx->WaitForKeyEx, &Index);
+		mTextInputEx->ReadKeyStrokeEx(mTextInputEx, &KeyData);
+	}
+	else
+	{
+		gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
+		gST->ConIn->ReadKeyStroke(gST->ConIn, &KeyData.Key);
+	}
+	return KeyData.Key.ScanCode != SCAN_ESC;
 }
 
 #if CONFIGURE_DRIVER
@@ -82,12 +90,20 @@ PromptInput(
 	{
 		SelectedChar = CHAR_NULL;
 
-		EFI_INPUT_KEY Key = { 0, 0 };
+		EFI_KEY_DATA KeyData = { 0 };
 		UINTN Index = 0;
-		gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
-		gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);
+		if (mTextInputEx != NULL)
+		{
+			gBS->WaitForEvent(1, &mTextInputEx->WaitForKeyEx, &Index);
+			mTextInputEx->ReadKeyStrokeEx(mTextInputEx, &KeyData);
+		}
+		else
+		{
+			gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
+			gST->ConIn->ReadKeyStroke(gST->ConIn, &KeyData.Key);
+		}
 
-		if (Key.UnicodeChar == CHAR_LINEFEED || Key.UnicodeChar == CHAR_CARRIAGE_RETURN)
+		if (KeyData.Key.UnicodeChar == CHAR_LINEFEED || KeyData.Key.UnicodeChar == CHAR_CARRIAGE_RETURN)
 		{
 			SelectedChar = DefaultSelection;
 			break;
@@ -95,9 +111,9 @@ PromptInput(
 
 		for (UINTN i = 0; i < NumAcceptedChars; ++i)
 		{
-			if (Key.UnicodeChar == AcceptedChars[i])
+			if (KeyData.Key.UnicodeChar == AcceptedChars[i])
 			{
-				SelectedChar = Key.UnicodeChar;
+				SelectedChar = KeyData.Key.UnicodeChar;
 				break;
 			}
 		}
@@ -587,6 +603,11 @@ UefiMain(
 	// Turn off the watchdog timer
 	//
 	gBS->SetWatchdogTimer(0, 0, 0, NULL);
+
+	//
+	// Query the console input handle for the Simple Text Input Ex protocol
+	//
+	gBS->HandleProtocol(gST->ConsoleInHandle, &gEfiSimpleTextInputExProtocolGuid, (VOID **)&mTextInputEx);
 
 	//
 	// Locate, load, start and configure the driver
