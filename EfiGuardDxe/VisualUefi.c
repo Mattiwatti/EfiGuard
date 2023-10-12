@@ -5,6 +5,7 @@
 
 #include <Uefi.h>
 #include <Protocol/DriverSupportedEfiVersion.h>
+#include <Protocol/SimpleTextInEx.h>
 #include <Protocol/EfiGuard.h>
 #include <Guid/Acpi.h>
 #include <Library/DebugLib.h>
@@ -31,6 +32,7 @@ EFI_GUID gEfiGuardDriverProtocolGuid = EFI_EFIGUARD_DRIVER_PROTOCOL_GUID;
 // GUIDs
 //
 EFI_GUID gEfiDriverSupportedEfiVersionProtocolGuid = EFI_DRIVER_SUPPORTED_EFI_VERSION_PROTOCOL_GUID;
+EFI_GUID gEfiSimpleTextInputExProtocolGuid = EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
 EFI_GUID gEfiAcpi20TableGuid = EFI_ACPI_20_TABLE_GUID;
 
 

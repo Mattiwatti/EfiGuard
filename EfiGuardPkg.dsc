@@ -66,6 +66,10 @@
   UefiBootManagerLib|MdeModulePkg/Library/UefiBootManagerLib/UefiBootManagerLib.inf
 
 [PcdsFixedAtBuild]
+!if $(TARGET) == DEBUG
+  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|0x07
+!endif
+
   # Enable error and progress status code reporting
   gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x03
 
