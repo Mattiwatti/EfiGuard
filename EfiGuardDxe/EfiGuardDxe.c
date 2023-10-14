@@ -270,52 +270,52 @@ HookedSetVariable(
 				BackdoorData->Size > 0 &&
 				(UINTN)BackdoorData->KernelAddress >= (UINTN)MM_SYSTEM_RANGE_START)
 			{
-				if (BackdoorData->IsMemCopy && BackdoorData->u.UserBuffer != NULL)
+				// For scalars, copy user value to kernel memory and put the old value in BackdoorData->u.XXX
+				switch (BackdoorData->Size)
 				{
-					if (BackdoorData->IsReadOperation) // Copy kernel buffer to user address
-						CopyMem(BackdoorData->u.UserBuffer, BackdoorData->KernelAddress, BackdoorData->Size);
-					else // Copy user buffer to kernel address
-						CopyMem(BackdoorData->KernelAddress, BackdoorData->u.UserBuffer, BackdoorData->Size);
-				}
-				else
-				{
-					// Copy user scalar to kernel memory, and put the old value in BackdoorData->u.XXX
-					switch (BackdoorData->Size)
+					case 1:
 					{
-						case 1:
+						CONST UINT8 NewByte = (UINT8)BackdoorData->u.s.Byte;
+						BackdoorData->u.s.Byte = *(UINT8*)BackdoorData->KernelAddress;
+						if (!BackdoorData->ReadOnly)
+							CopyWpMem(BackdoorData->KernelAddress, &NewByte, sizeof(NewByte));
+						break;
+					}
+					case 2:
+					{
+						CONST UINT16 NewWord = (UINT16)BackdoorData->u.s.Word;
+						BackdoorData->u.s.Word = *(UINT16*)BackdoorData->KernelAddress;
+						if (!BackdoorData->ReadOnly)
+							CopyWpMem(BackdoorData->KernelAddress, &NewWord, sizeof(NewWord));
+						break;
+					}
+					case 4:
+					{
+						CONST UINT32 NewDword = (UINT32)BackdoorData->u.s.Dword;
+						BackdoorData->u.s.Dword = *(UINT32*)BackdoorData->KernelAddress;
+						if (!BackdoorData->ReadOnly)
+							CopyWpMem(BackdoorData->KernelAddress, &NewDword, sizeof(NewDword));
+						break;
+					}
+					case 8:
+					{
+						CONST UINT64 NewQword = BackdoorData->u.Qword;
+						BackdoorData->u.Qword = *(UINT64*)BackdoorData->KernelAddress;
+						if (!BackdoorData->ReadOnly)
+							CopyWpMem(BackdoorData->KernelAddress, &NewQword, sizeof(NewQword));
+						break;
+					}
+					default:
+					{
+						// Arbitrary size memcpy
+						if (BackdoorData->u.UserBuffer != NULL)
 						{
-							CONST UINT8 NewByte = (UINT8)BackdoorData->u.s.Byte;
-							BackdoorData->u.s.Byte = *(UINT8*)BackdoorData->KernelAddress;
-							if (!BackdoorData->IsReadOperation)
-								*(UINT8*)BackdoorData->KernelAddress = NewByte;
-							break;
+							if (BackdoorData->ReadOnly)
+								CopyWpMem(BackdoorData->u.UserBuffer, BackdoorData->KernelAddress, BackdoorData->Size);
+							else
+								CopyWpMem(BackdoorData->KernelAddress, BackdoorData->u.UserBuffer, BackdoorData->Size);
 						}
-						case 2:
-						{
-							CONST UINT16 NewWord = (UINT16)BackdoorData->u.s.Word;
-							BackdoorData->u.s.Word = *(UINT16*)BackdoorData->KernelAddress;
-							if (!BackdoorData->IsReadOperation)
-								*(UINT16*)BackdoorData->KernelAddress = NewWord;
-							break;
-						}
-						case 4:
-						{
-							CONST UINT32 NewDword = (UINT32)BackdoorData->u.s.Dword;
-							BackdoorData->u.s.Dword = *(UINT32*)BackdoorData->KernelAddress;
-							if (!BackdoorData->IsReadOperation)
-								*(UINT32*)BackdoorData->KernelAddress = NewDword;
-							break;
-						}
-						case 8:
-						{
-							CONST UINT64 NewQword = BackdoorData->u.Qword;
-							BackdoorData->u.Qword = *(UINT64*)BackdoorData->KernelAddress;
-							if (!BackdoorData->IsReadOperation)
-								*(UINT64*)BackdoorData->KernelAddress = NewQword;
-							break;
-						}
-						default:
-							break; // Invalid size; do nothing
+						break;
 					}
 				}
 

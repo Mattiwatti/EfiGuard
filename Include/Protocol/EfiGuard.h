@@ -82,9 +82,8 @@ typedef struct _EFIGUARD_BACKDOOR_DATA {
 		VOID* UserBuffer;
 	} u;
 
-	BOOLEAN IsMemCopy;
-	BOOLEAN IsReadOperation;
 	UINT32 Size;
+	BOOLEAN ReadOnly;
 } EFIGUARD_BACKDOOR_DATA;
 
 

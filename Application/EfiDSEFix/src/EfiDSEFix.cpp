@@ -366,9 +366,8 @@ TestSetVariableHook(
 	BackdoorData.CookieValue = EFIGUARD_BACKDOOR_COOKIE_VALUE;
 	BackdoorData.KernelAddress = reinterpret_cast<PVOID>(HalBase);
 	BackdoorData.u.Qword = UINT64_MAX; // Bogus value to verify write-back after the read operation
-	BackdoorData.IsMemCopy = FALSE;
-	BackdoorData.IsReadOperation = TRUE;
 	BackdoorData.Size = sizeof(UINT16);
+	BackdoorData.ReadOnly = TRUE;
 
 	// Call SetVariable()
 	UNICODE_STRING VariableName = RTL_CONSTANT_STRING(EFIGUARD_BACKDOOR_VARIABLE_NAME);
@@ -447,9 +446,8 @@ TriggerExploit(
 		BackdoorData.u.s.Dword = static_cast<UINT32>(CiOptionsValue);
 	else if (CiPatchSize == sizeof(UINT8))
 		BackdoorData.u.s.Byte = static_cast<UINT8>(CiOptionsValue);
-	BackdoorData.IsMemCopy = FALSE;								// This is a scalar operation, not memcpy
-	BackdoorData.IsReadOperation = ReadOnly;					// Specify whether this is a read or a write operation
-	BackdoorData.Size = CiPatchSize;							// This value determines the field (Byte/Word/Dword/Qword) that the value to write will be read from, and written to on return
+	BackdoorData.Size = CiPatchSize;							// Determines which field the value will be read/written from/to
+	BackdoorData.ReadOnly = ReadOnly;							// Whether this is a read or read + write
 
 	// Call NtSetSystemEnvironmentValueEx -> [...] -> hal!HalSetEnvironmentVariableEx -> hal!HalEfiSetEnvironmentVariable -> EfiRT->SetVariable.
 	// On Windows >= 8 it is possible to use SetFirmwareEnvironmentVariableExW. We use the syscall directly because it exists on Windows 7 and Vista.
