@@ -132,7 +132,7 @@ DisableWriteProtect(
 	if (*WpEnabled)
 	{
 		if (*CetEnabled)
-			DisableCet();
+			AsmDisableCet();
 		AsmWriteCr0(Cr0 & ~CR0_WP);
 	}
 }
@@ -148,7 +148,7 @@ EnableWriteProtect(
 	{
 		AsmWriteCr0(AsmReadCr0() | CR0_WP);
 		if (CetEnabled)
-			EnableCet();
+			AsmEnableCet();
 	}
 }
 

@@ -70,7 +70,7 @@ PrintKernelPatchInfo(
 //
 VOID
 EFIAPI
-DisableCet(
+AsmDisableCet(
 	VOID
 	);
 
@@ -79,7 +79,7 @@ DisableCet(
 //
 VOID
 EFIAPI
-EnableCet(
+AsmEnableCet(
 	VOID
 	);
 
