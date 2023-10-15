@@ -89,7 +89,6 @@ DisablePatchGuard(
 	IN UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN PEFI_IMAGE_SECTION_HEADER InitSection,
-	IN PEFI_IMAGE_SECTION_HEADER InitDataSection,
 	IN PEFI_IMAGE_SECTION_HEADER TextSection,
 	IN UINT16 BuildNumber
 	)
@@ -362,8 +361,7 @@ DisablePatchGuard(
 
 	// We need KiSwInterruptDispatch to call ExAllocatePool2 for our preferred method to work, because we rely on it to
 	// return null for zero pool tags. Windows 10 20H1 does export ExAllocatePool2, but without using it where we need it.
-	CONST BOOLEAN FindGlobalPgContext = BuildNumber >= 20348 && InitDataSection != NULL &&
-		GetProcedureAddress((UINTN)ImageBase, NtHeaders, "ExAllocatePool2") != NULL;
+	CONST BOOLEAN FindGlobalPgContext = BuildNumber >= 20348 && GetProcedureAddress((UINTN)ImageBase, NtHeaders, "ExAllocatePool2") != NULL;
 
 	// Search for KiSwInterrupt[Dispatch] and optionally its global PatchGuard context (named g_PgContext here). Both of these only exist on Windows >= 10
 	UINT8* KiSwInterruptPatternAddress = NULL, *gPgContext = NULL;
@@ -450,7 +448,7 @@ DisablePatchGuard(
 	}
 	if (gPgContext != NULL)
 	{
-		CONST UINT64 NewPgContextAddress = (UINT64)ImageBase + InitDataSection->VirtualAddress; // Address in discardable section
+		CONST UINT64 NewPgContextAddress = (UINT64)ImageBase + InitSection->VirtualAddress; // Address in discardable section
 		CopyWpMem(gPgContext, &NewPgContextAddress, sizeof(NewPgContextAddress));
 	}
 	else if (KiSwInterruptPatternAddress != NULL)
@@ -853,7 +851,7 @@ PatchNtoskrnl(
 	}
 
 	// Find the INIT and PAGE sections
-	PEFI_IMAGE_SECTION_HEADER InitSection = NULL, InitDataSection = NULL, TextSection = NULL, PageSection = NULL;
+	PEFI_IMAGE_SECTION_HEADER InitSection = NULL, TextSection = NULL, PageSection = NULL;
 	PEFI_IMAGE_SECTION_HEADER Section = IMAGE_FIRST_SECTION(NtHeaders);
 	for (UINT16 i = 0; i < NtHeaders->FileHeader.NumberOfSections; ++i)
 	{
@@ -863,8 +861,6 @@ PatchNtoskrnl(
 
 		if (AsciiStrCmp(SectionName, "INIT") == 0)
 			InitSection = Section;
-		else if (AsciiStrCmp(SectionName, "INITDATA") == 0)
-			InitDataSection = Section;
 		else if (AsciiStrCmp(SectionName, ".text") == 0)
 			TextSection = Section;
 		else if (AsciiStrCmp(SectionName, "PAGE") == 0)
@@ -873,7 +869,7 @@ PatchNtoskrnl(
 		Section++;
 	}
 
-	ASSERT(InitSection != NULL && InitDataSection != NULL && TextSection != NULL && PageSection != NULL);
+	ASSERT(InitSection != NULL && TextSection != NULL && PageSection != NULL);
 
 	// Patch INIT and .text sections to disable PatchGuard
 	PRINT_KERNEL_PATCH_MSG(L"[PatchNtoskrnl] Disabling PatchGuard... [INIT RVA: 0x%X - 0x%X]\r\n",
@@ -881,7 +877,6 @@ PatchNtoskrnl(
 	Status = DisablePatchGuard(ImageBase,
 								NtHeaders,
 								InitSection,
-								InitDataSection,
 								TextSection,
 								BuildNumber);
 	if (EFI_ERROR(Status))
