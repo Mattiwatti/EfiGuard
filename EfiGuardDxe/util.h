@@ -148,6 +148,16 @@ StrniCmp(
 	);
 
 //
+// Case-insensitive string search.
+//
+CONST CHAR16*
+EFIAPI
+StriStr(
+	IN CONST CHAR16 *String1,
+	IN CONST CHAR16 *String2
+	);
+
+//
 // Waits for a key to be pressed before continuing execution.
 // Returns FALSE if ESC was pressed to abort, TRUE otherwise.
 //

@@ -225,6 +225,43 @@ StrniCmp(
 	return UpperFirstChar - UpperSecondChar;
 }
 
+CONST CHAR16*
+EFIAPI
+StriStr(
+	IN CONST CHAR16 *String1,
+	IN CONST CHAR16 *String2
+	)
+{
+	if (*String2 == L'\0')
+		return String1;
+
+	while (*String1 != L'\0')
+	{
+		CONST CHAR16* FirstMatch = String1;
+		CONST CHAR16* String2Ptr = String2;
+		CHAR16 String1Char = CharToUpper(*String1);
+		CHAR16 String2Char = CharToUpper(*String2Ptr);
+
+		while (String1Char == String2Char && String1Char != L'\0')
+		{
+			String1++;
+			String2Ptr++;
+
+			String1Char = CharToUpper(*String1);
+			String2Char = CharToUpper(*String2Ptr);
+		}
+
+		if (String2Char == L'\0')
+			return FirstMatch;
+
+		if (String1Char == L'\0')
+			return NULL;
+
+		String1 = FirstMatch + 1;
+	}
+	return NULL;
+}
+
 BOOLEAN
 EFIAPI
 WaitForKey(

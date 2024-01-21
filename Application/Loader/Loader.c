@@ -146,6 +146,44 @@ PromptInput(
 	return SelectedChar;
 }
 
+STATIC
+CONST CHAR16*
+EFIAPI
+StriStr(
+	IN CONST CHAR16 *String1,
+	IN CONST CHAR16 *String2
+	)
+{
+	if (*String2 == L'\0')
+		return String1;
+
+	while (*String1 != L'\0')
+	{
+		CONST CHAR16* FirstMatch = String1;
+		CONST CHAR16* String2Ptr = String2;
+		CHAR16 String1Char = CharToUpper(*String1);
+		CHAR16 String2Char = CharToUpper(*String2Ptr);
+
+		while (String1Char == String2Char && String1Char != L'\0')
+		{
+			String1++;
+			String2Ptr++;
+
+			String1Char = CharToUpper(*String1);
+			String2Char = CharToUpper(*String2Ptr);
+		}
+
+		if (String2Char == L'\0')
+			return FirstMatch;
+
+		if (String1Char == L'\0')
+			return NULL;
+
+		String1 = FirstMatch + 1;
+	}
+	return NULL;
+}
+
 // 
 // Try to find a file by browsing each device
 // 
@@ -453,8 +491,7 @@ TryBootOptionsInOrder(
 		// but for some types of boots the filename will always be bootx64.efi, so this can't be avoided.
 		if (!MaybeWindows &&
 			ConvertedPath != NULL &&
-			(StrStr(ConvertedPath, L"bootmgfw.efi") != NULL || StrStr(ConvertedPath, L"BOOTMGFW.EFI") != NULL ||
-			StrStr(ConvertedPath, L"bootx64.efi") != NULL || StrStr(ConvertedPath, L"BOOTX64.EFI") != NULL))
+			(StriStr(ConvertedPath, L"bootmgfw.efi") != NULL || StriStr(ConvertedPath, L"bootx64.efi") != NULL))
 		{
 			MaybeWindows = TRUE;
 		}
