@@ -40,6 +40,11 @@ BmSetMemoryTypeInformationVariable(
 	IN BOOLEAN Boot
 	);
 
+BOOLEAN
+EFIAPI
+BmIsAutoCreateBootOption(
+	IN EFI_BOOT_MANAGER_LOAD_OPTION *BootOption
+	);
 
 STATIC
 VOID
@@ -602,8 +607,11 @@ TryBootOptionsInOrder(
 		ASSERT_EFI_ERROR(Status);
 
 		// Set image load options from the boot option
-		ImageInfo->LoadOptionsSize = BootOptions[Index].OptionalDataSize;
-		ImageInfo->LoadOptions = BootOptions[Index].OptionalData;
+		if (!BmIsAutoCreateBootOption(&BootOptions[Index]))
+		{
+			ImageInfo->LoadOptionsSize = BootOptions[Index].OptionalDataSize;
+			ImageInfo->LoadOptions = BootOptions[Index].OptionalData;
+		}
 
 		// "Clean to NULL because the image is loaded directly from the firmware's boot manager." (EDK2) Good call, I agree
 		ImageInfo->ParentHandle = NULL;
