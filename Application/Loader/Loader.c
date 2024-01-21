@@ -195,7 +195,8 @@ LocateFile(
 									EFI_FILE_READ_ONLY);
 		if (!EFI_ERROR(Status))
 		{
-			VolumeHandle->Close(FileHandle);
+			FileHandle->Close(FileHandle);
+			VolumeHandle->Close(VolumeHandle);
 			*DevicePath = FileDevicePath(Handles[i], ImagePath);
 			CHAR16 *PathString = ConvertDevicePathToText(*DevicePath, TRUE, TRUE);
 			DEBUG((DEBUG_INFO, "[LOADER] Found file at %S.\r\n", PathString));
@@ -203,6 +204,7 @@ LocateFile(
 				FreePool(PathString);
 			break;
 		}
+		VolumeHandle->Close(VolumeHandle);
 	}
 
 	FreePool(Handles);
