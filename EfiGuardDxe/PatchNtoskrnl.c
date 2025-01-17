@@ -287,7 +287,7 @@ DisablePatchGuard(
 
 	// Search for callers of KiMcaDeferredRecoveryService (only exists on Windows >= 8.1)
 	UINT8* KiMcaDeferredRecoveryServiceCallers[2];
-	ZeroMem(KiMcaDeferredRecoveryServiceCallers, sizeof(KiMcaDeferredRecoveryServiceCallers));
+	ZeroMem((VOID*)KiMcaDeferredRecoveryServiceCallers, sizeof(KiMcaDeferredRecoveryServiceCallers));
 	if (BuildNumber >= 9600)
 	{
 		StartRva = TextSection->VirtualAddress;

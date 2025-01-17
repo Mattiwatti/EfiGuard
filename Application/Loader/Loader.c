@@ -250,7 +250,7 @@ LocateFile(
 		VolumeHandle->Close(VolumeHandle);
 	}
 
-	FreePool(Handles);
+	FreePool((VOID*)Handles);
 
 	return Status;
 }

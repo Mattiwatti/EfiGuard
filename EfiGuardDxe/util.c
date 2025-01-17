@@ -279,7 +279,7 @@ WaitForKey(
 	{
 		UINTN Index = 0;
 		if (Tpl <= TPL_APPLICATION)
-			gBS->WaitForEvent(1, gTextInputEx != NULL ? gTextInputEx->WaitForKeyEx : &gST->ConIn->WaitForKey, &Index);
+			gBS->WaitForEvent(1, (VOID**)(gTextInputEx != NULL ? gTextInputEx->WaitForKeyEx : gST->ConIn->WaitForKey), &Index);
 		else
 			RtlStall(1); // WaitForEvent() unavailable, burn CPU
 
@@ -539,8 +539,8 @@ BacktrackToFunctionStart(
 
 	if (High >= Low)
 	{
-		// If the function entry specifies indirection, get the address of the master function entry
-		if ((FunctionEntry->u.UnwindData & RUNTIME_FUNCTION_INDIRECT) != 0)
+		// If the function entry specifies indirection, get the address of its master function entry
+		while ((FunctionEntry->u.UnwindData & RUNTIME_FUNCTION_INDIRECT) != 0)
 		{
 			FunctionEntry = (PIMAGE_RUNTIME_FUNCTION_ENTRY)(FunctionEntry->u.UnwindData + ImageBase - 1);
 		}
