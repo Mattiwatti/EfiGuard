@@ -26,6 +26,8 @@
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
     <SpectreMitigation>false</SpectreMitigation>
+    <VcpkgEnabled>false</VcpkgEnabled>
+    <EnableStdModules>false</EnableStdModules>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (native subsystem)|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -34,6 +36,8 @@
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
     <SpectreMitigation>false</SpectreMitigation>
+    <VcpkgEnabled>false</VcpkgEnabled>
+    <EnableStdModules>false</EnableStdModules>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -62,7 +66,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Gw /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Gw /utf-8 /Zc:threadSafeInit- %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DisableSpecificWarnings>4201</DisableSpecificWarnings>
       <ExceptionHandling>false</ExceptionHandling>
@@ -71,6 +75,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Include;$(SolutionDir)../MdePkg/Include;$(SolutionDir)../MdePkg/Include/X64;$(SolutionDir)../MdeModulePkg/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <BuildStlModules>false</BuildStlModules>
+      <EnableModules>false</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -101,7 +106,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Gw /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Gw /utf-8 /Zc:threadSafeInit- %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DisableSpecificWarnings>4201</DisableSpecificWarnings>
       <ExceptionHandling>false</ExceptionHandling>
@@ -110,6 +115,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Include;$(SolutionDir)../MdePkg/Include;$(SolutionDir)../MdePkg/Include/X64;$(SolutionDir)../MdeModulePkg/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <BuildStlModules>false</BuildStlModules>
+      <EnableModules>false</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Native</SubSystem>

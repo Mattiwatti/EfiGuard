@@ -91,6 +91,11 @@
   INTEL:*_*_*_CC_FLAGS = /utf-8
   GCC:*_*_*_CC_FLAGS = -finput-charset=UTF-8
 
+  # https://github.com/Mattiwatti/EfiGuard/issues/134
+  # https://github.com/tianocore/edk2/issues/10547
+  MSFT:*_*_*_CC_FLAGS = /GS-
+  GCC:*_*_*_CC_FLAGS = -fno-stack-protector
+
   # Pre-emptive strike for when this horrible option inevitably becomes the default
   MSFT:*_*_*_CC_FLAGS = /Qspectre-
 
