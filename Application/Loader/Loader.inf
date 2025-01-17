@@ -14,7 +14,6 @@
   MdePkg/MdePkg.dec
   EfiGuardPkg/EfiGuardPkg.dec
   MdeModulePkg/MdeModulePkg.dec
-  OvmfPkg/OvmfPkg.dec
 
 [LibraryClasses]
   UefiApplicationEntryPoint
