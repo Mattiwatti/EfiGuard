@@ -156,7 +156,7 @@ HookedLoadImage(
 
 	// We only have a filename to go on at this point. We will determine the final 'is this bootmgfw.efi?' status after the image has been loaded
 	CONST BOOLEAN MaybeBootmgfw = ImagePath != NULL
-		? StriStr(ImagePath, L"bootmgfw.efi") != NULL || StriStr(ImagePath, L"bootx64.efi") != NULL
+		? StriStr(ImagePath, L"bootmgfw.efi") != NULL || StriStr(ImagePath, L"Bootmgfw_ms.vc") != NULL || StriStr(ImagePath, L"bootx64.efi") != NULL
 		: FALSE;
 	CONST BOOLEAN IsBoot = (MaybeBootmgfw || (BootPolicy == TRUE && SourceBuffer == NULL));
 
