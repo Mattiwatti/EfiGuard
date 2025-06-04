@@ -40,8 +40,6 @@ typedef EFI_IMAGE_EXPORT_DIRECTORY *PEFI_IMAGE_EXPORT_DIRECTORY;
 #define VS_VERSION_INFO									1
 #define VS_FF_DEBUG										(0x00000001L)
 
-#define RUNTIME_FUNCTION_INDIRECT						0x1
-
 #define IMAGE32(NtHeaders) ((NtHeaders)->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC)
 #define IMAGE64(NtHeaders) ((NtHeaders)->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC)
 
@@ -173,10 +171,75 @@ typedef struct _VS_VERSIONINFO
 	// Omitted: padding fields that do not contribute to TotalSize
 } VS_VERSIONINFO, *PVS_VERSIONINFO;
 
+//
+// Unwind information flags
+//
+#define UNW_FLAG_NHANDLER		0x0
+#define UNW_FLAG_EHANDLER		0x1
+#define UNW_FLAG_UHANDLER		0x2
+#define UNW_FLAG_CHAININFO		0x4
+
+#define UNW_FLAG_NO_EPILOGUE	0x80000000UL // Software only flag
+
+#define UNWIND_CHAIN_LIMIT		32
+
+//
+// Unwind code structure
+//
+typedef union _IMAGE_FUNCTION_UNWIND_CODE
+{
+	struct
+	{
+		UINT8 CodeOffset;
+		UINT8 UnwindOp : 4;
+		UINT8 OpInfo : 4;
+	} s;
+
+	struct
+	{
+		UINT8 OffsetLow;
+		UINT8 UnwindOp : 4;
+		UINT8 OffsetHigh : 4;
+	} EpilogueCode;
+
+	UINT16 FrameOffset;
+} IMAGE_FUNCTION_UNWIND_CODE, *PIMAGE_FUNCTION_UNWIND_CODE;
+
+//
+// Uwind information structure
+//
+typedef struct _IMAGE_FUNCTION_UNWIND_INFO
+{
+	UINT8 Version : 3;
+	UINT8 Flags : 5;
+	UINT8 SizeOfProlog;
+	UINT8 CountOfUnwindCodes;
+	UINT8 FrameRegister : 4;
+	UINT8 FrameOffset : 4;
+	IMAGE_FUNCTION_UNWIND_CODE UnwindCode[1];
+
+//
+// The unwind codes are followed by an optional DWORD aligned field that
+// contains the exception handler address or the address of chained unwind
+// information. If an exception handler address is specified, then it is
+// followed by the language specified exception handler data.
+//
+// union {
+//	 struct {
+//		 UINT32 ExceptionHandler;
+//		 UINT32 FunctionEntry;
+//	 };
+//
+//	 UINT32 ExceptionData[];
+// };
+//
+} IMAGE_FUNCTION_UNWIND_INFO, *PIMAGE_FUNCTION_UNWIND_INFO;
 
 //
 // Function table entry data
 //
+#define RUNTIME_FUNCTION_INDIRECT	 0x1
+
 typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY
 {
 	UINT32 BeginAddress;

@@ -420,6 +420,19 @@ FindFunctionStart(
 		{
 			FunctionEntry = (PIMAGE_RUNTIME_FUNCTION_ENTRY)(FunctionEntry->u.UnwindData + ImageBase - 1);
 		}
+
+		// Traverse any chained unwind info until we find the primary function entry.
+		PIMAGE_FUNCTION_UNWIND_INFO UnwindInfo = (PIMAGE_FUNCTION_UNWIND_INFO)(FunctionEntry->u.UnwindData + ImageBase);
+		UINT32 ChainCount = 0;
+		while ((UnwindInfo->Flags & UNW_FLAG_CHAININFO) != 0)
+		{
+			ChainCount += 1;
+			if (ChainCount > UNWIND_CHAIN_LIMIT)
+				return NULL;
+
+			FunctionEntry = (PIMAGE_RUNTIME_FUNCTION_ENTRY)&(UnwindInfo->UnwindCode[(UnwindInfo->CountOfUnwindCodes + 1) & ~1]);
+			UnwindInfo = (PIMAGE_FUNCTION_UNWIND_INFO)(FunctionEntry->u.UnwindData + ImageBase);
+		}
 		
 		return (UINT8*)ImageBase + FunctionEntry->BeginAddress;
 	}
