@@ -102,7 +102,8 @@ DisablePatchGuard(
 	UINT8* KeInitAmd64SpecificStatePatternAddress = NULL;
 	for (UINT8* Address = StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKeInitAmd64SpecificState); ++Address)
 	{
-		if (CompareMem(Address, SigKeInitAmd64SpecificState, sizeof(SigKeInitAmd64SpecificState)) == 0)
+		if (CompareMem(Address, SigKeInitAmd64SpecificState, sizeof(SigKeInitAmd64SpecificState)) == 0 &&
+			FindFunctionStart(ImageBase, NtHeaders, Address) != NULL)
 		{
 			KeInitAmd64SpecificStatePatternAddress = Address;
 			PRINT_KERNEL_PATCH_MSG(L"    Found KeInitAmd64SpecificState pattern at 0x%llX.\r\n", (UINTN)KeInitAmd64SpecificStatePatternAddress);
@@ -174,7 +175,8 @@ DisablePatchGuard(
 				// Check if this is 'call RtlPcToFileHeader'
 				ZyanU64 OperandAddress = 0;
 				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
-					OperandAddress == RtlPcToFileHeader)
+					OperandAddress == RtlPcToFileHeader &&
+					FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 				{
 					CcInitializeBcbProfilerPatternAddress = (UINT8*)Context.InstructionAddress;
 					PRINT_KERNEL_PATCH_MSG(L"    Found 'call RtlPcToFileHeader' at 0x%llX.\r\n", (UINTN)CcInitializeBcbProfilerPatternAddress);
@@ -189,7 +191,8 @@ DisablePatchGuard(
 				((Context.Operands[0].reg.value == ZYDIS_REGISTER_AL && Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
 					(UINT64)(Context.Operands[1].mem.disp.value) == 0x0FFFFF780000002D4ULL) ||
 				(Context.Operands[0].reg.value == ZYDIS_REGISTER_RAX && Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
-					Context.Operands[1].imm.value.u == 0x0FFFFF780000002D4ULL)))
+					Context.Operands[1].imm.value.u == 0x0FFFFF780000002D4ULL)) &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				CcInitializeBcbProfilerPatternAddress = (UINT8*)Context.InstructionAddress;
 				PRINT_KERNEL_PATCH_MSG(L"    Found CcInitializeBcbProfiler pattern at 0x%llX.\r\n", (UINTN)CcInitializeBcbProfilerPatternAddress);
@@ -237,7 +240,8 @@ DisablePatchGuard(
 				Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
 				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_AL &&
 				Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[1].mem.segment == ZYDIS_REGISTER_DS &&
-				Context.Operands[1].mem.disp.value == 0x0FFFFF780000002D4LL)
+				Context.Operands[1].mem.disp.value == 0x0FFFFF780000002D4LL &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				ExpLicenseWatchInitWorkerPatternAddress = (UINT8*)Context.InstructionAddress;
 				PRINT_KERNEL_PATCH_MSG(L"    Found ExpLicenseWatchInitWorker pattern at 0x%llX.\r\n", (UINTN)ExpLicenseWatchInitWorkerPatternAddress);
@@ -299,7 +303,8 @@ DisablePatchGuard(
 		UINT8* KiMcaDeferredRecoveryService = NULL;
 		for (UINT8* Address = StartVa; Address < StartVa + SizeOfRawData - sizeof(SigKiMcaDeferredRecoveryService); ++Address)
 		{
-			if (CompareMem(Address, SigKiMcaDeferredRecoveryService, sizeof(SigKiMcaDeferredRecoveryService)) == 0)
+			if (CompareMem(Address, SigKiMcaDeferredRecoveryService, sizeof(SigKiMcaDeferredRecoveryService)) == 0 &&
+				FindFunctionStart(ImageBase, NtHeaders, Address) != NULL)
 			{
 				KiMcaDeferredRecoveryService = Address;
 				PRINT_KERNEL_PATCH_MSG(L"    Found KiMcaDeferredRecoveryService pattern at 0x%llX.\r\n", (UINTN)KiMcaDeferredRecoveryService);
@@ -333,7 +338,8 @@ DisablePatchGuard(
 			ZyanU64 OperandAddress = 0;	
 			if (Context.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL &&
 				ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
-				OperandAddress == (UINTN)KiMcaDeferredRecoveryService)
+				OperandAddress == (UINTN)KiMcaDeferredRecoveryService &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				if (KiMcaDeferredRecoveryServiceCallers[0] == NULL)
 				{
@@ -420,7 +426,8 @@ DisablePatchGuard(
 					Context.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[1].mem.base == ZYDIS_REGISTER_RIP &&
 					(Context.Operands[1].mem.segment == ZYDIS_REGISTER_CS || Context.Operands[1].mem.segment == ZYDIS_REGISTER_DS))
 				{
-					if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, (ZyanU64*)&gPgContext)))
+					if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, (ZyanU64*)&gPgContext)) &&
+						FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 					{
 						PRINT_KERNEL_PATCH_MSG(L"    Found g_PgContext at 0x%llX.\r\n", (UINTN)gPgContext);
 						break;
@@ -611,7 +618,8 @@ DisableDSE(
 
 		// Check if this is a 2-byte (size of our patch) 'mov ecx, <anything>' and store the instruction address if so
 		if (Context.Instruction.operand_count == 2 && Context.Instruction.length == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
-			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_ECX)
+			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_ECX &&
+			FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 		{
 			LastMovIntoEcx = (UINT8*)Context.InstructionAddress;
 		}
@@ -634,7 +642,8 @@ DisableDSE(
 			// 'call qword ptr ds:[CiInitialize IAT RVA]'	// FF 15 ?? ?? ?? ??		// Windows 10.0.16299.0+
 			ZyanU64 OperandAddress = 0;
 			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
-				OperandAddress == (UINTN)CiInitialize)
+				OperandAddress == (UINTN)CiInitialize &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				SepInitializeCodeIntegrityMovEcxAddress = LastMovIntoEcx; // The last 'mov ecx, xxx' before the call/jmp is the instruction we want
 				PRINT_KERNEL_PATCH_MSG(L"    Found 'mov ecx, xxx' in SepInitializeCodeIntegrity [RVA: 0x%X].\r\n",
@@ -678,7 +687,8 @@ DisableDSE(
 				Context.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Context.Operands[0].mem.base == ZYDIS_REGISTER_RIP &&
 				Context.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER)
 			{
-				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &gCiEnabled)))
+				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &gCiEnabled)) &&
+					FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 				{
 					PRINT_KERNEL_PATCH_MSG(L"    Found g_CiEnabled at 0x%llX.\r\n", gCiEnabled);
 					break;
@@ -719,7 +729,8 @@ DisableDSE(
 		if ((BuildNumber >= 9200 &&
 			(Context.Instruction.operand_count == 2 && Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV) &&
 			(Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && Context.Operands[0].reg.value == ZYDIS_REGISTER_EAX) &&
-			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && (Context.Operands[1].imm.value.s & 0xFFFFFFFFLL) == 0xc0000428LL))
+			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && (Context.Operands[1].imm.value.s & 0xFFFFFFFFLL) == 0xc0000428LL) &&
+			FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 		{
 			// Exclude false positives: next instruction must be jmp rel32 (Win 8), jmp rel8 (Win 8.1/10) or ret
 			CONST UINT8* Address = (UINT8*)Context.InstructionAddress;
@@ -740,7 +751,8 @@ DisableDSE(
 		{
 			ZyanU64 OperandAddress = 0;
 			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
-				OperandAddress == gCiEnabled)
+				OperandAddress == gCiEnabled &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				// Verify the next instruction is jz, and store its address instead of the cmp, as we will be patching the jz
 				CONST UINT8* Address = (UINT8*)Context.InstructionAddress;

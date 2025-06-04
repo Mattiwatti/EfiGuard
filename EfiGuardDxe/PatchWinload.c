@@ -227,7 +227,8 @@ PatchImgpValidateImageHash(
 			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
 			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
 			Context.Operands[1].imm.is_signed == ZYAN_TRUE &&
-			Context.Operands[1].imm.value.s == (ZyanI64)((ZyanI32)0xFFFFFFD7)) // Sign extend to 64 bits
+			Context.Operands[1].imm.value.s == (ZyanI64)((ZyanI32)0xFFFFFFD7) && // Sign extend to 64 bits
+			FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 		{
 			AndMinusFortyOneAddress = (UINT8*)Context.InstructionAddress;
 			break;
@@ -363,7 +364,8 @@ PatchImgpFilterValidationFailure(
 		{
 			ZyanU64 OperandAddress = 0;
 			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, &OperandAddress)) &&
-				OperandAddress == (UINTN)IntegrityFailureStringAddress)
+				OperandAddress == (UINTN)IntegrityFailureStringAddress &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				LeaIntegrityFailureAddress = (UINT8*)Context.InstructionAddress;
 				Print(L"    Found load instruction for load failure string at 0x%llx.\r\n", (UINTN)LeaIntegrityFailureAddress);
@@ -548,7 +550,8 @@ FindOslFwpKernelSetupPhase1(
 		{
 			ZyanU64 OperandAddress = 0;
 			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[1], Context.InstructionAddress, &OperandAddress)) &&
-				OperandAddress == (UINTN)PatternAddress)
+				OperandAddress == (UINTN)PatternAddress &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				// Check for false positives (BlFwGetSystemTable)
 				CONST UINT8* Check = (UINT8*)(CodeStartVa + Context.Offset - 4); // 4 = length of 'lea rdx, [r11+18h]' which precedes this instruction in EfipGetRsdt
@@ -604,7 +607,8 @@ FindOslFwpKernelSetupPhase1(
 			// Check if this is 'call EfipGetRsdt'
 			ZyanU64 OperandAddress = 0;
 			if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Context.Instruction, &Context.Operands[0], Context.InstructionAddress, &OperandAddress)) &&
-				OperandAddress == (UINTN)EfipGetRsdt)
+				OperandAddress == (UINTN)EfipGetRsdt &&
+				FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
 			{
 				// Calculate the distance from the start of the function to the instruction. OslFwpKernelSetupPhase1 will always have the shortest distance
 				CONST UINTN StartOfFunction = (UINTN)FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress);
