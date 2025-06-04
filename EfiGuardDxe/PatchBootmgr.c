@@ -239,7 +239,7 @@ EFI_STATUS
 EFIAPI
 PatchBootManager(
 	IN INPUT_FILETYPE FileType,
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN UINTN ImageSize
 	)
 {
@@ -305,7 +305,7 @@ PatchBootManager(
 	// Found signature; backtrack to function start
 	// Note: pOriginalAddress is a pointer to a (function) pointer, because the original address depends on the type of boot manager we are patching.
 	VOID **pOriginalAddress = PatchingBootmgrEfi ? &gOriginalBootmgrImgArchStartBootApplication : &gOriginalBootmgfwImgArchStartBootApplication;
-	*pOriginalAddress = (VOID*)BacktrackToFunctionStart(ImageBase, NtHeaders, Found);
+	*pOriginalAddress = (VOID*)FindFunctionStart(ImageBase, NtHeaders, Found);
 	CONST VOID* OriginalAddress = *pOriginalAddress;
 	if (OriginalAddress == NULL)
 	{

@@ -246,6 +246,14 @@ RtlpImageDirectoryEntryToDataEx(
 	OUT UINT32 *Size
 	);
 
+UINT8*
+EFIAPI
+FindFunctionStart(
+	IN CONST UINT8* ImageBase,
+	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
+	IN CONST UINT8* AddressInFunction
+	);
+
 EFI_STATUS
 EFIAPI
 FindResourceDataById(

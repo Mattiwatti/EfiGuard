@@ -370,6 +370,63 @@ RtlpImageDirectoryEntryToDataEx(
 	return (UINT8*)(Base) + RvaToOffset(NtHeaders, Rva);
 }
 
+// Finds the start of a function given an address within it using the function unwind data in the exception directory.
+// Returns NULL if AddressInFunction is NULL (this simplifies error checking logic in calling functions).
+//
+// NB. The (preserved) presence of function unwind data in EFI PE files is unusual outside of Microsoft binaries,
+// and this function cannot reliably be used on arbitrary PE images.
+UINT8*
+EFIAPI
+FindFunctionStart(
+	IN CONST UINT8* ImageBase,
+	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
+	IN CONST UINT8* AddressInFunction
+	)
+{
+	// Test for null. This allows callers to do 'FindPattern(..., &Address); X = Backtrack(Address, ...)' with a single failure branch
+	if (AddressInFunction == NULL)
+		return NULL;
+	if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION)
+		return NULL;
+
+	CONST PIMAGE_RUNTIME_FUNCTION_ENTRY FunctionTable = (PIMAGE_RUNTIME_FUNCTION_ENTRY)(ImageBase + NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress);
+	CONST UINT32 FunctionTableSize = NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size;
+	if (FunctionTableSize == 0)
+		return NULL;
+
+	// Do a binary search until we find the function that contains our address
+	CONST UINT32 RelativeAddress = (UINT32)(AddressInFunction - ImageBase);
+	PIMAGE_RUNTIME_FUNCTION_ENTRY FunctionEntry = NULL;
+	INT32 Low = 0;
+	INT32 High = (INT32)(FunctionTableSize / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY)) - 1;
+	
+	while (High >= Low)
+	{
+		CONST INT32 Middle = (Low + High) >> 1;
+		FunctionEntry = &FunctionTable[Middle];
+
+		if (RelativeAddress < FunctionEntry->BeginAddress)
+			High = Middle - 1;
+		else if (RelativeAddress >= FunctionEntry->EndAddress)
+			Low = Middle + 1;
+		else
+			break;
+	}
+
+	if (High >= Low)
+	{
+		// If the function entry specifies indirection, get the address of its master function entry
+		while ((FunctionEntry->u.UnwindData & RUNTIME_FUNCTION_INDIRECT) != 0)
+		{
+			FunctionEntry = (PIMAGE_RUNTIME_FUNCTION_ENTRY)(FunctionEntry->u.UnwindData + ImageBase - 1);
+		}
+		
+		return (UINT8*)ImageBase + FunctionEntry->BeginAddress;
+	}
+
+	return NULL;
+}
+
 // Similar to LdrFindResource_U + LdrAccessResource combined, with some shortcuts for size optimization:
 // - Only IDs are supported for type/name/language, not strings. Named entries ("MUI", "RCDATA", ...) are ignored.
 // - Only images are supported, not mapped data files (e.g. LoadLibrary(..., LOAD_LIBRARY_AS_DATAFILE) data).

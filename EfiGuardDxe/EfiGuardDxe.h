@@ -99,7 +99,7 @@ EFI_STATUS
 EFIAPI
 PatchBootManager(
 	IN INPUT_FILETYPE FileType,
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN UINTN ImageSize
 	);
 
@@ -130,7 +130,7 @@ HookedOslFwpKernelSetupPhase1(
 EFI_STATUS
 EFIAPI
 PatchWinload(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	);
 
@@ -143,7 +143,7 @@ EFI_STATUS
 EFIAPI
 PatchImgpValidateImageHash(
 	IN INPUT_FILETYPE FileType,
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	);
 
@@ -156,7 +156,7 @@ EFI_STATUS
 EFIAPI
 PatchImgpFilterValidationFailure(
 	IN INPUT_FILETYPE FileType,
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	);
 
@@ -188,7 +188,7 @@ BlStatusPrintNoop(
 EFI_STATUS
 EFIAPI
 PatchNtoskrnl(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	);
 

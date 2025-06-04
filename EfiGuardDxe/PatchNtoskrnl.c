@@ -86,7 +86,7 @@ STATIC
 EFI_STATUS
 EFIAPI
 DisablePatchGuard(
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN PEFI_IMAGE_SECTION_HEADER InitSection,
 	IN PEFI_IMAGE_SECTION_HEADER TextSection,
@@ -95,7 +95,7 @@ DisablePatchGuard(
 {
 	UINT32 StartRva = InitSection->VirtualAddress;
 	UINT32 SizeOfRawData = InitSection->SizeOfRawData;
-	UINT8* StartVa = ImageBase + StartRva;
+	UINT8* StartVa = (UINT8*)ImageBase + StartRva;
 
 	// Search for KeInitAmd64SpecificState
 	PRINT_KERNEL_PATCH_MSG(L"\r\n== Searching for nt!KeInitAmd64SpecificState pattern in INIT ==\r\n");
@@ -111,7 +111,7 @@ DisablePatchGuard(
 	}
 
 	// Backtrack to function start
-	UINT8* KeInitAmd64SpecificState = BacktrackToFunctionStart(ImageBase, NtHeaders, KeInitAmd64SpecificStatePatternAddress);
+	UINT8* KeInitAmd64SpecificState = FindFunctionStart(ImageBase, NtHeaders, KeInitAmd64SpecificStatePatternAddress);
 	if (KeInitAmd64SpecificState == NULL)
 	{
 		PRINT_KERNEL_PATCH_MSG(L"    Failed to find KeInitAmd64SpecificState%S.\r\n",
@@ -201,7 +201,7 @@ DisablePatchGuard(
 	}
 
 	// Backtrack to function start
-	UINT8* CcInitializeBcbProfiler = BacktrackToFunctionStart(ImageBase, NtHeaders, CcInitializeBcbProfilerPatternAddress);
+	UINT8* CcInitializeBcbProfiler = FindFunctionStart(ImageBase, NtHeaders, CcInitializeBcbProfilerPatternAddress);
 	if (CcInitializeBcbProfiler == NULL)
 	{
 		PRINT_KERNEL_PATCH_MSG(L"    Failed to find %S%S.\r\n",
@@ -248,7 +248,7 @@ DisablePatchGuard(
 		}
 
 		// Backtrack to function start
-		ExpLicenseWatchInitWorker = BacktrackToFunctionStart(ImageBase, NtHeaders, ExpLicenseWatchInitWorkerPatternAddress);
+		ExpLicenseWatchInitWorker = FindFunctionStart(ImageBase, NtHeaders, ExpLicenseWatchInitWorkerPatternAddress);
 		if (ExpLicenseWatchInitWorker == NULL)
 		{
 			PRINT_KERNEL_PATCH_MSG(L"    Failed to find ExpLicenseWatchInitWorker%S.\r\n",
@@ -277,7 +277,7 @@ DisablePatchGuard(
 		PRINT_KERNEL_PATCH_MSG(L"    Found KiVerifyScopesExecute pattern at 0x%llX.\r\n", (UINTN)KiVerifyScopesExecutePatternAddress);
 
 		// Backtrack to function start
-		KiVerifyScopesExecute = BacktrackToFunctionStart(ImageBase, NtHeaders, KiVerifyScopesExecutePatternAddress);
+		KiVerifyScopesExecute = FindFunctionStart(ImageBase, NtHeaders, KiVerifyScopesExecutePatternAddress);
 		if (KiVerifyScopesExecute == NULL)
 		{
 			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiVerifyScopesExecute.\r\n");
@@ -292,7 +292,7 @@ DisablePatchGuard(
 	{
 		StartRva = TextSection->VirtualAddress;
 		SizeOfRawData = TextSection->SizeOfRawData;
-		StartVa = ImageBase + StartRva;
+		StartVa = (UINT8*)ImageBase + StartRva;
 
 		// Search for KiMcaDeferredRecoveryService
 		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiMcaDeferredRecoveryService pattern in .text ==\r\n");
@@ -350,8 +350,8 @@ DisablePatchGuard(
 		}
 
 		// Backtrack to function start
-		KiMcaDeferredRecoveryServiceCallers[0] = BacktrackToFunctionStart(ImageBase, NtHeaders, KiMcaDeferredRecoveryServiceCallers[0]);
-		KiMcaDeferredRecoveryServiceCallers[1] = BacktrackToFunctionStart(ImageBase, NtHeaders, KiMcaDeferredRecoveryServiceCallers[1]);
+		KiMcaDeferredRecoveryServiceCallers[0] = FindFunctionStart(ImageBase, NtHeaders, KiMcaDeferredRecoveryServiceCallers[0]);
+		KiMcaDeferredRecoveryServiceCallers[1] = FindFunctionStart(ImageBase, NtHeaders, KiMcaDeferredRecoveryServiceCallers[1]);
 		if (KiMcaDeferredRecoveryServiceCallers[0] == NULL || KiMcaDeferredRecoveryServiceCallers[1] == NULL)
 		{
 			PRINT_KERNEL_PATCH_MSG(L"    Failed to find KiMcaDeferredRecoveryService callers.\r\n");
@@ -369,7 +369,7 @@ DisablePatchGuard(
 	{
 		StartRva = TextSection->VirtualAddress;
 		SizeOfRawData = TextSection->SizeOfRawData;
-		StartVa = ImageBase + StartRva;
+		StartVa = (UINT8*)ImageBase + StartRva;
 
 		PRINT_KERNEL_PATCH_MSG(L"== Searching for nt!KiSwInterrupt pattern in .text ==\r\n");
 		UINT8* KiSwInterruptDispatchAddress = NULL;
@@ -502,7 +502,7 @@ STATIC
 EFI_STATUS
 EFIAPI
 DisableDSE(
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders,
 	IN PEFI_IMAGE_SECTION_HEADER PageSection,
 	IN EFIGUARD_DSE_BYPASS_TYPE BypassType,
@@ -813,7 +813,7 @@ DisableDSE(
 EFI_STATUS
 EFIAPI
 PatchNtoskrnl(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	)
 {

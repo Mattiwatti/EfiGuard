@@ -178,7 +178,7 @@ EFI_STATUS
 EFIAPI
 PatchImgpValidateImageHash(
 	IN INPUT_FILETYPE FileType,
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	)
 {
@@ -220,7 +220,7 @@ PatchImgpValidateImageHash(
 			continue;
 		}
 
-		// Check if this is 'and REG32, 0FFFFFFD7h' (only esi and r8d are used here really)
+		// Check if this is 'and REG32, 0FFFFFFD7h'
 		if (Context.Instruction.operand_count == 3 &&
 			(Context.Instruction.length == 3 || Context.Instruction.length == 4) &&
 			Context.Instruction.mnemonic == ZYDIS_MNEMONIC_AND &&
@@ -237,7 +237,7 @@ PatchImgpValidateImageHash(
 	}
 
 	// Backtrack to function start
-	UINT8* ImgpValidateImageHash = BacktrackToFunctionStart(ImageBase, NtHeaders, AndMinusFortyOneAddress);
+	UINT8* ImgpValidateImageHash = FindFunctionStart(ImageBase, NtHeaders, AndMinusFortyOneAddress);
 	if (ImgpValidateImageHash == NULL)
 	{
 		Print(L"    Failed to find %S!ImgpValidateImageHash%S.\r\n",
@@ -264,7 +264,7 @@ EFI_STATUS
 EFIAPI
 PatchImgpFilterValidationFailure(
 	IN INPUT_FILETYPE FileType,
-	IN UINT8* ImageBase,
+	IN CONST UINT8* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	)
 {
@@ -375,7 +375,7 @@ PatchImgpFilterValidationFailure(
 	}
 
 	// Backtrack to function start
-	UINT8* ImgpFilterValidationFailure = BacktrackToFunctionStart(ImageBase, NtHeaders, LeaIntegrityFailureAddress);
+	UINT8* ImgpFilterValidationFailure = FindFunctionStart(ImageBase, NtHeaders, LeaIntegrityFailureAddress);
 	if (ImgpFilterValidationFailure == NULL)
 	{
 		Print(L"    Failed to find %S!ImgpFilterValidationFailure%S.\r\n",
@@ -427,7 +427,7 @@ FindOslFwpKernelSetupPhase1(
 		if (!EFI_ERROR(Status))
 		{
 			// Found signature; backtrack to function start
-			*OslFwpKernelSetupPhase1Address = BacktrackToFunctionStart(ImageBase, NtHeaders, Found);
+			*OslFwpKernelSetupPhase1Address = FindFunctionStart(ImageBase, NtHeaders, Found);
 			if (*OslFwpKernelSetupPhase1Address != NULL)
 			{
 				Print(L"\r\nFound OslFwpKernelSetupPhase1 at 0x%llX.\r\n", (UINTN)(*OslFwpKernelSetupPhase1Address));
@@ -479,7 +479,7 @@ FindOslFwpKernelSetupPhase1(
 					CONST UINT8* CallBlBdStopAddress = (UINT8*)Context.InstructionAddress;
 					if ((CallBlBdStopAddress[-6] == 0x89 || CallBlBdStopAddress[-6] == 0x8B) &&
 						*(UINT32*)(&CallBlBdStopAddress[-4]) == 0x124 &&
-						(*OslFwpKernelSetupPhase1Address = BacktrackToFunctionStart(ImageBase, NtHeaders, CallBlBdStopAddress)) != NULL)
+						(*OslFwpKernelSetupPhase1Address = FindFunctionStart(ImageBase, NtHeaders, CallBlBdStopAddress)) != NULL)
 					{
 						Print(L"    Found OslFwpKernelSetupPhase1 at 0x%llX.\r\n\r\n", (UINTN)(*OslFwpKernelSetupPhase1Address));
 						return EFI_SUCCESS;
@@ -570,7 +570,7 @@ FindOslFwpKernelSetupPhase1(
 		return EFI_NOT_FOUND;
 	}
 
-	CONST UINT8* EfipGetRsdt = BacktrackToFunctionStart(ImageBase, NtHeaders, LeaEfiAcpiTableGuidAddress);
+	CONST UINT8* EfipGetRsdt = FindFunctionStart(ImageBase, NtHeaders, LeaEfiAcpiTableGuidAddress);
 	if (EfipGetRsdt == NULL)
 	{
 		Print(L"    Failed to find EfipGetRsdt.\r\n");
@@ -607,7 +607,7 @@ FindOslFwpKernelSetupPhase1(
 				OperandAddress == (UINTN)EfipGetRsdt)
 			{
 				// Calculate the distance from the start of the function to the instruction. OslFwpKernelSetupPhase1 will always have the shortest distance
-				CONST UINTN StartOfFunction = (UINTN)BacktrackToFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress);
+				CONST UINTN StartOfFunction = (UINTN)FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress);
 				CONST UINTN Distance = Context.InstructionAddress - StartOfFunction;
 				if (Distance < ShortestDistanceToCall)
 				{
@@ -639,7 +639,7 @@ FindOslFwpKernelSetupPhase1(
 EFI_STATUS
 EFIAPI
 PatchWinload(
-	IN VOID* ImageBase,
+	IN CONST VOID* ImageBase,
 	IN PEFI_IMAGE_NT_HEADERS NtHeaders
 	)
 {
