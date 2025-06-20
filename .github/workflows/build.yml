@@ -1,0 +1,86 @@
+name: Build 
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-edk2:
+    name: Build EDK2 Components
+    runs-on: windows-latest
+    container:
+      image: ghcr.io/tianocore/containers/windows-2022-build:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build EfiGuardDxe and Loader
+        run: |
+          build -a X64 -t VS2022 -p EfiGuardPkg.dsc -b RELEASE
+
+      - name: Upload EDK2 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: edk2-components
+          path: |
+            Build/EfiGuard/RELEASE_VS2022/X64/EfiGuardDxe.efi
+            Build/EfiGuard/RELEASE_VS2022/X64/Loader.efi
+
+  build-efidsefix:
+    name: Build EfiDSEFix
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build EfiDSEFix
+        run: msbuild EfiGuard.sln /p:Configuration=Release /p:Platform=x64
+
+      - name: Upload EfiDSEFix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: efidsefix
+          path: Application/EfiDSEFix/bin/x64/Release/EfiDSEFix.exe
+
+  create-release-package:
+    name: Create Release Package
+    runs-on: ubuntu-latest
+    needs: [build-edk2, build-efidsefix]
+    
+    steps:
+      - name: Download EDK2 components
+        uses: actions/download-artifact@v4
+        with:
+          name: edk2-components
+          
+      - name: Download EfiDSEFix
+        uses: actions/download-artifact@v4
+        with:
+          name: efidsefix
+          
+      - name: Create directory structure
+        run: |
+          mkdir -p EFI/Boot
+          cp EfiGuardDxe.efi EFI/Boot/
+          cp Loader.efi EFI/Boot/
+          cp EfiDSEFix.exe ./
+          
+      - name: Upload complete package
+        uses: actions/upload-artifact@v4
+        with:
+          name: EfiGuard-package
+          path: |
+            EFI/
+            EfiDSEFix.exe
