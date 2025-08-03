@@ -67,7 +67,7 @@
       <UACExecutionLevel />
       <UACUIAccess />
       <TypeLibraryResourceID />
-      <AdditionalOptions>/ALIGN:0x200 /FILEALIGN:0x200 /SECTION:.pdata,!D /SECTION:.xdata,!D /OPT:ICF=10 /IGNORE:4254 /IGNORE:4281 /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/ALIGN:0x1000 /FILEALIGN:0x1000 /SECTION:.pdata,!D /SECTION:.xdata,!D /OPT:ICF=10 /IGNORE:4254 /IGNORE:4281 /NOVCFEATURE /NOCOFFGRPINFO /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
       <MergeSections>.rdata=.data</MergeSections>
       <LinkErrorReporting />
       <ProfileGuidedDatabase />
