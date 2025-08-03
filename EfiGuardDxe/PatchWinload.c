@@ -246,6 +246,53 @@ PatchImgpValidateImageHash(
 		return EFI_NOT_FOUND;
 	}
 
+	// Find select occurrences of 'return STATUS_IMAGE_CHECKSUM_MISMATCH' and avoid them.
+	Context.Length = CodeSizeOfRawData;
+	Context.Offset = 0;
+
+	// Start decode loop
+	while ((Context.InstructionAddress = (ZyanU64)(CodeStartVa + Context.Offset),
+			Status = ZydisDecoderDecodeFull(&Context.Decoder,
+											(VOID*)Context.InstructionAddress,
+											Context.Length - Context.Offset,
+											&Context.Instruction,
+											Context.Operands)) != ZYDIS_STATUS_NO_MORE_DATA)
+	{
+		if (!ZYAN_SUCCESS(Status))
+		{
+			Context.Offset++;
+			continue;
+		}
+
+		// Check if this is 'mov REG32, C0000221h'
+		if (Context.Instruction.operand_count == 2 &&
+			(Context.Instruction.length == 5 || Context.Instruction.length == 6) &&
+			Context.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
+			Context.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER &&
+			Context.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
+			Context.Operands[1].imm.is_signed == ZYAN_TRUE &&
+			Context.Operands[1].imm.value.s == (ZyanI64)((ZyanI32)0xC0000221) &&
+			FindFunctionStart(ImageBase, NtHeaders, (UINT8*)Context.InstructionAddress) != NULL)
+		{
+			UINT8* CheckJccAddress = (UINT8*)(Context.InstructionAddress - 2);
+			if ((*CheckJccAddress & 0x70) == 0x70) // Jcc rel8?
+			{
+				SetWpMem(CheckJccAddress, 1, 0xEB); // Change to jmp rel8
+			}
+			else
+			{
+				CheckJccAddress = (UINT8*)(Context.InstructionAddress - 6);
+				if (CheckJccAddress[0] == 0x0F && (CheckJccAddress[1] & 0x80) == 0x80) // Jcc rel32?
+				{
+					CONST UINT16 NopPlusJmpOpcode = 0xE990;
+					CopyWpMem(CheckJccAddress, &NopPlusJmpOpcode, sizeof(NopPlusJmpOpcode)); // Change to nop, jmp rel32
+				}
+			}
+		}
+
+		Context.Offset += Context.Instruction.length;
+	}
+
 	// Apply the patch
 	CONST UINT32 Ok = 0xC3C033; // xor eax, eax, ret
 	CopyWpMem(ImgpValidateImageHash, &Ok, sizeof(Ok));
