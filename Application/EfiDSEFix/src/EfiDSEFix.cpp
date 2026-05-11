@@ -71,6 +71,8 @@ FindCiEnabled(
 }
 
 // For Windows 8 and worse. Credits: DSEFix by hfiref0x
+// TODO: consider switching to Zydis for this? At this point, this code is both verbose and brittle.
+// https://github.com/hfiref0x/KDU has a more robust scan using HDE, but it still fundamentally suffers from the same issues.
 static
 LONG
 FindCiOptions(
@@ -160,9 +162,15 @@ FindCiOptions(
 		if (hs.flags & F_ERROR)
 			break;
 
-		if (hs.len == 6 && *reinterpret_cast<PUSHORT>(CipInitialize + i) == 0x0d89) // mov g_CiOptions, ecx
+		// TODO: this should really match arbitrary r32 immediates.
+		UCHAR PrefixSkip = ((hs.flags & F_PREFIX_ANY) != 0) ? 1 : 0; // Expected to only ever be F_PREFIX_REX
+		UCHAR ExpectedLength = 6 + PrefixSkip;
+
+		if (hs.len == ExpectedLength &&
+			(*reinterpret_cast<PUSHORT>(CipInitialize + i + PrefixSkip) == 0x0d89) ||	// mov g_CiOptions, ecx
+			(*reinterpret_cast<PUSHORT>(CipInitialize + i + PrefixSkip) == 0x2d89))		// mov g_CiOptions, r13d
 		{
-			Relative = *reinterpret_cast<PLONG>(CipInitialize + i + 2);
+			Relative = *reinterpret_cast<PLONG>(CipInitialize + i + PrefixSkip + 2);
 			break;
 		}
 
@@ -427,7 +435,10 @@ AdjustCiOptions(
 	PVOID CiOptionsAddress;
 	NTSTATUS Status = FindCiOptionsVariable(&CiOptionsAddress);
 	if (!NT_SUCCESS(Status))
+	{
+		Printf(L"Failed to find %ls address: error 0x%08lX.\n", (NtCurrentPeb()->OSBuildNumber >= 9200 ? L"CI!g_CiOptions" : L"nt!g_CiEnabled"), Status);
 		return Status;
+	}
 
 	Printf(L"%ls at 0x%p.\n", (NtCurrentPeb()->OSBuildNumber >= 9200 ? L"CI!g_CiOptions" : L"nt!g_CiEnabled"), CiOptionsAddress);
 
