@@ -162,16 +162,21 @@ FindCiOptions(
 		if (hs.flags & F_ERROR)
 			break;
 
-		// TODO: this should really match arbitrary r32 immediates.
 		UCHAR PrefixSkip = ((hs.flags & F_PREFIX_ANY) != 0) ? 1 : 0; // Expected to only ever be F_PREFIX_REX
 		UCHAR ExpectedLength = 6 + PrefixSkip;
 
 		if (hs.len == ExpectedLength &&
-			(*reinterpret_cast<PUSHORT>(CipInitialize + i + PrefixSkip) == 0x0d89) ||	// mov g_CiOptions, ecx
-			(*reinterpret_cast<PUSHORT>(CipInitialize + i + PrefixSkip) == 0x2d89))		// mov g_CiOptions, r13d
+			CipInitialize[i + PrefixSkip] == 0x89) // mov g_CiOptions, r32
 		{
-			Relative = *reinterpret_cast<PLONG>(CipInitialize + i + PrefixSkip + 2);
-			break;
+			UCHAR ModRM = CipInitialize[i + PrefixSkip + 1];
+			UCHAR Mod = (ModRM >> 6) & 0x3;
+			UCHAR Rm = ModRM & 0x7;
+
+			if (Mod == 0 && Rm == 5) // mov [rip+disp32], r32 // mod = 0, R/M = 101
+			{
+				Relative = *reinterpret_cast<PLONG>(CipInitialize + i + PrefixSkip + 2);
+				break;
+			}
 		}
 
 		i += hs.len;
